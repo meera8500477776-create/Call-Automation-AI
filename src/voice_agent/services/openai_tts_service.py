@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class OpenAITTSConfig:
     """
     Configuration for OpenAI TTS service.
-    
+
     Attributes:
         api_key: OpenAI API key
         default_voice_config: Default voice configuration
@@ -39,7 +39,7 @@ class OpenAITTSConfig:
 class OpenAITTSService:
     """
     OpenAI Text-to-Speech service wrapper.
-    
+
     Provides streaming synthesis with consistent interface to ElevenLabs
     for use as a fallback TTS provider. Supports OpenAI's TTS models
     with natural-sounding voices.
@@ -58,7 +58,7 @@ class OpenAITTSService:
     def __init__(self, config: OpenAITTSConfig):
         """
         Initialize OpenAI TTS service.
-        
+
         Args:
             config: TTS configuration including API key and voice settings
         """
@@ -78,17 +78,17 @@ class OpenAITTSService:
     ) -> AsyncIterator[bytes]:
         """
         Synthesize text to speech with streaming output.
-        
+
         Generates audio chunks as they become available for minimal latency.
         Note: OpenAI TTS does not support SSML or emotional tags like ElevenLabs.
-        
+
         Args:
             text: Text to synthesize
             voice_config: Voice configuration (uses default if None)
-            
+
         Yields:
             Audio data chunks as bytes
-            
+
         Raises:
             RuntimeError: If synthesis fails
             ValueError: If text is empty or voice is invalid
@@ -143,13 +143,13 @@ class OpenAITTSService:
     def _get_openai_voice(self, voice_id: str) -> str:
         """
         Map voice_id to OpenAI voice name.
-        
+
         Args:
             voice_id: Voice identifier (can be OpenAI voice name or custom mapping)
-            
+
         Returns:
             OpenAI voice name
-            
+
         Raises:
             ValueError: If voice is not supported
         """
@@ -167,14 +167,14 @@ class OpenAITTSService:
     def apply_emotional_context(self, text: str, tags: list[str]) -> str:
         """
         Apply emotional context to text.
-        
+
         Note: OpenAI TTS does not support audio tags or SSML like ElevenLabs.
         This method is provided for interface consistency but returns text unchanged.
-        
+
         Args:
             text: Original text
             tags: List of emotional tags (ignored for OpenAI)
-            
+
         Returns:
             Original text unchanged
         """
@@ -193,18 +193,18 @@ class OpenAITTSService:
     ) -> str:
         """
         Clone a voice from audio samples.
-        
+
         Note: OpenAI TTS does not support voice cloning.
         This method is provided for interface consistency.
-        
+
         Args:
             audio_samples: List of audio file data (bytes)
             voice_name: Name for the cloned voice
             description: Optional description of the voice
-            
+
         Returns:
             Voice ID of the cloned voice
-            
+
         Raises:
             NotImplementedError: OpenAI TTS does not support voice cloning
         """
@@ -216,13 +216,13 @@ class OpenAITTSService:
     async def get_voice_settings(self, voice_id: str) -> VoiceSettings:
         """
         Retrieve voice settings for a specific voice.
-        
+
         Note: OpenAI TTS does not have configurable voice settings like ElevenLabs.
         This method returns default settings for interface consistency.
-        
+
         Args:
             voice_id: OpenAI voice identifier
-            
+
         Returns:
             Default voice settings
         """
@@ -242,7 +242,7 @@ class OpenAITTSService:
     async def list_available_voices(self) -> list[dict]:
         """
         List all available voices from OpenAI.
-        
+
         Returns:
             List of voice information dictionaries
         """

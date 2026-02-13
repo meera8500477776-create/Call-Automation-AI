@@ -41,7 +41,7 @@ class CallStatus(Enum):
 @dataclass
 class TwilioConfig:
     """Configuration for Twilio integration.
-    
+
     Attributes:
         account_sid: Twilio account SID
         auth_token: Twilio authentication token
@@ -65,7 +65,7 @@ class TwilioConfig:
 @dataclass
 class CallMetadata:
     """Metadata extracted from a Twilio call.
-    
+
     Attributes:
         call_sid: Unique identifier for the call
         caller_id: Phone number of the caller (E.164 format)
@@ -113,14 +113,14 @@ class CallMetadata:
 
 class TwilioIntegration:
     """Twilio telephony integration layer.
-    
+
     Handles WebSocket/WebRTC connections to Twilio, processes incoming
     and outgoing audio streams, and manages call lifecycle.
     """
 
     def __init__(self, config: TwilioConfig):
         """Initialize Twilio integration.
-        
+
         Args:
             config: Twilio configuration
         """
@@ -170,7 +170,7 @@ class TwilioIntegration:
 
     def on_audio_received(self, callback: Callable[[bytes], None]) -> None:
         """Register callback for incoming audio data.
-        
+
         Args:
             callback: Function to call with audio data (bytes)
         """
@@ -179,7 +179,7 @@ class TwilioIntegration:
 
     def on_call_started(self, callback: Callable[[CallMetadata], None]) -> None:
         """Register callback for call start event.
-        
+
         Args:
             callback: Function to call with call metadata
         """
@@ -188,7 +188,7 @@ class TwilioIntegration:
 
     def on_call_ended(self, callback: Callable[[CallMetadata], None]) -> None:
         """Register callback for call end event.
-        
+
         Args:
             callback: Function to call with call metadata
         """
@@ -197,7 +197,7 @@ class TwilioIntegration:
 
     def on_dtmf(self, callback: Callable[[str], None]) -> None:
         """Register callback for DTMF tone detection.
-        
+
         Args:
             callback: Function to call with DTMF digit
         """
@@ -206,7 +206,7 @@ class TwilioIntegration:
 
     def on_error(self, callback: Callable[[Exception], None]) -> None:
         """Register callback for error events.
-        
+
         Args:
             callback: Function to call with exception
         """
@@ -215,10 +215,10 @@ class TwilioIntegration:
 
     async def connect(self, websocket_url: str) -> None:
         """Connect to Twilio via WebSocket.
-        
+
         Args:
             websocket_url: WebSocket URL provided by Twilio
-            
+
         Raises:
             ConnectionError: If connection fails
         """
@@ -271,10 +271,10 @@ class TwilioIntegration:
 
     async def send_audio(self, audio_data: bytes) -> None:
         """Send audio data to Twilio.
-        
+
         Args:
             audio_data: Raw audio bytes to send
-            
+
         Raises:
             RuntimeError: If not connected
         """
@@ -353,7 +353,7 @@ class TwilioIntegration:
 
     async def _handle_connected(self, message: dict[str, Any]) -> None:
         """Handle connected event from Twilio.
-        
+
         Args:
             message: Connected event message
         """
@@ -362,7 +362,7 @@ class TwilioIntegration:
 
     async def _handle_start(self, message: dict[str, Any]) -> None:
         """Handle start event from Twilio.
-        
+
         Args:
             message: Start event message with call metadata
         """
@@ -404,7 +404,7 @@ class TwilioIntegration:
 
     async def _handle_media(self, message: dict[str, Any]) -> None:
         """Handle media event from Twilio.
-        
+
         Args:
             message: Media event message with audio data
         """
@@ -429,7 +429,7 @@ class TwilioIntegration:
 
     async def _handle_stop(self, message: dict[str, Any]) -> None:
         """Handle stop event from Twilio.
-        
+
         Args:
             message: Stop event message
         """
@@ -459,7 +459,7 @@ class TwilioIntegration:
 
     async def _handle_dtmf(self, message: dict[str, Any]) -> None:
         """Handle DTMF event from Twilio.
-        
+
         Args:
             message: DTMF event message
         """
@@ -478,7 +478,7 @@ class TwilioIntegration:
 
     def get_call_metadata(self) -> CallMetadata | None:
         """Get current call metadata.
-        
+
         Returns:
             Call metadata if call is active, None otherwise
         """
@@ -486,7 +486,7 @@ class TwilioIntegration:
 
     def extract_caller_id(self) -> str | None:
         """Extract caller ID from current call.
-        
+
         Returns:
             Caller ID (phone number) if available, None otherwise
         """
@@ -496,7 +496,7 @@ class TwilioIntegration:
 
     def extract_call_sid(self) -> str | None:
         """Extract call SID from current call.
-        
+
         Returns:
             Call SID if available, None otherwise
         """

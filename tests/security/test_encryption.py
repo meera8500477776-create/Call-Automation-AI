@@ -295,7 +295,7 @@ class TestEncryptionService:
         text = "Email: test@example.com"
 
         # Tokenize to populate cache
-        tokenized = service.tokenize_pii(text)
+        service.tokenize_pii(text)
         assert len(service._token_map) > 0
 
         # Clear cache
@@ -363,9 +363,9 @@ class TestEncryptionProperties:
     def test_encryption_round_trip(self, data: bytes):
         """
         Property 3: Encryption round-trip
-        
+
         For any data, encrypting then decrypting should produce the original data.
-        
+
         **Validates: Requirements 7.3**
         """
         service = EncryptionService()
@@ -387,9 +387,9 @@ class TestEncryptionProperties:
     def test_encryption_round_trip_with_custom_key(self, data: bytes, key_id: str):
         """
         Property 3 (extended): Encryption round-trip with custom key IDs
-        
+
         For any data and any valid key ID, encrypting then decrypting should produce the original data.
-        
+
         **Validates: Requirements 7.3**
         """
         service = EncryptionService()
@@ -408,9 +408,9 @@ class TestEncryptionProperties:
     def test_encrypted_data_differs_from_original(self, data: bytes):
         """
         Property: Encrypted data should differ from original (except for edge cases).
-        
+
         Verifies that encryption actually transforms the data.
-        
+
         **Validates: Requirements 7.3**
         """
         service = EncryptionService()

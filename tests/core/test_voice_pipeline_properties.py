@@ -12,7 +12,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
-from hypothesis import given, settings, HealthCheck
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from src.voice_agent.core.voice_pipeline import (
@@ -160,14 +160,14 @@ class TestVoicePipelineStageOrderingProperties:
     async def test_pipeline_stage_ordering(self, audio_data, transcript):
         """
         Property 6: Pipeline stage ordering.
-        
+
         For any audio input, pipeline stages should execute in order:
         VAD → STT → LLM → TTS
-        
+
         This property verifies that the voice pipeline processes audio through
         the correct sequence of stages, ensuring proper data flow and
         maintaining the expected processing order.
-        
+
         **Validates: Requirements 2.3**
         """
         # Create tracker to monitor stage execution order
@@ -244,7 +244,6 @@ class TestVoicePipelineStageOrderingProperties:
                 tracker.stages.append("VAD")
                 return original_vad_process(audio_chunk)
 
-            original_stt_send = pipeline._stt_service.send_audio
 
             async def tracked_stt_send(audio_chunk):
                 await tracker.record_stage("STT")
@@ -329,7 +328,7 @@ class TestVoicePipelineStageOrderingProperties:
     @pytest.mark.property
     @pytest.mark.asyncio
     @settings(
-        max_examples=30, 
+        max_examples=30,
         deadline=5000,
         suppress_health_check=[HealthCheck.data_too_large]
     )
@@ -340,13 +339,13 @@ class TestVoicePipelineStageOrderingProperties:
     async def test_pipeline_stage_ordering_multiple_chunks(self, audio_chunks, transcript):
         """
         Property 6 (extended): Pipeline stage ordering with multiple audio chunks.
-        
+
         For multiple audio inputs, pipeline stages should maintain order:
         VAD → STT → LLM → TTS, even when processing multiple chunks.
-        
+
         This verifies that the pipeline maintains correct ordering even with
         multiple audio chunks being processed.
-        
+
         **Validates: Requirements 2.3**
         """
         # Create tracker to monitor stage execution order
@@ -422,7 +421,6 @@ class TestVoicePipelineStageOrderingProperties:
                 tracker.stages.append("VAD")
                 return original_vad_process(audio_chunk)
 
-            original_stt_send = pipeline._stt_service.send_audio
 
             async def tracked_stt_send(audio_chunk):
                 await tracker.record_stage("STT")
@@ -499,10 +497,10 @@ class TestVoicePipelineStageOrderingProperties:
     async def test_vad_always_processes_before_stt(self, audio_data):
         """
         Property: VAD always processes audio before STT.
-        
+
         For any audio input, VAD should process the audio before it's sent
         to the STT service. This ensures speech detection happens first.
-        
+
         **Validates: Requirements 2.3, 2.4**
         """
         # Create tracker
@@ -564,7 +562,6 @@ class TestVoicePipelineStageOrderingProperties:
                 tracker.stages.append("VAD")
                 return original_vad_process(audio_chunk)
 
-            original_stt_send = pipeline._stt_service.send_audio
 
             async def tracked_stt_send(audio_chunk):
                 await tracker.record_stage("STT")

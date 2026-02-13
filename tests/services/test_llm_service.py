@@ -221,7 +221,7 @@ class TestLLMResponse:
 class TestIntentClassification:
     """
     Test intent classification from transcripts.
-    
+
     **Validates: Requirements 10.2**
     """
 
@@ -335,7 +335,7 @@ class TestIntentClassification:
 class TestParameterExtraction:
     """
     Test parameter extraction from transcripts.
-    
+
     **Validates: Requirements 10.3**
     """
 
@@ -408,7 +408,7 @@ class TestParameterExtraction:
 class TestToolExecutionDecisions:
     """
     Test tool execution decision logic.
-    
+
     **Validates: Requirements 10.4**
     """
 
@@ -492,7 +492,7 @@ class TestToolExecutionDecisions:
 class TestVoiceOptimizedFormatting:
     """
     Test voice-optimized response formatting.
-    
+
     **Validates: Requirements 6.1, 6.2, 6.3**
     """
 
@@ -593,12 +593,12 @@ class TestVoiceOptimizedFormatting:
         """Test removing multiple formatting types at once."""
         response = """
         ## Important Information
-        
+
         Here are **key points**:
         - First *point* with `code`
         - Second point
         - Third point
-        
+
         Visit [our site](https://example.com) for more.
         """
         formatted = llm_service.format_for_voice(response)

@@ -165,9 +165,9 @@ def tenant_config_strategy(draw):
 @pytest.mark.property
 class TestConfigurationRoundTrip:
     """Property 1: Configuration round-trip.
-    
+
     **Validates: Requirements 1.1, 1.2**
-    
+
     For any valid TenantConfig, serializing then deserializing should produce
     an equivalent configuration.
     """
@@ -180,7 +180,7 @@ class TestConfigurationRoundTrip:
     @given(tenant_config_strategy())
     def test_json_round_trip(self, config: TenantConfig):
         """Test that TenantConfig survives JSON serialization round-trip.
-        
+
         **Validates: Requirements 1.1, 1.2**
         """
         # Serialize to JSON
@@ -202,7 +202,7 @@ class TestConfigurationRoundTrip:
     @given(tenant_config_strategy())
     def test_dict_round_trip(self, config: TenantConfig):
         """Test that TenantConfig survives dict conversion round-trip.
-        
+
         **Validates: Requirements 1.1, 1.2**
         """
         # Convert to dict
@@ -223,7 +223,7 @@ class TestConfigurationRoundTrip:
     @given(tenant_config_strategy())
     def test_yaml_round_trip(self, config: TenantConfig):
         """Test that TenantConfig survives YAML serialization round-trip.
-        
+
         **Validates: Requirements 1.1, 1.2**
         """
         # Serialize to YAML
@@ -246,7 +246,7 @@ class TestConfigurationRoundTrip:
     @given(tenant_config_strategy())
     def test_nested_model_preservation(self, config: TenantConfig):
         """Test that nested models are preserved through serialization.
-        
+
         **Validates: Requirements 1.1, 1.2**
         """
         # Serialize and deserialize
@@ -276,7 +276,7 @@ class TestConfigurationRoundTrip:
     @given(tenant_config_strategy())
     def test_enum_preservation(self, config: TenantConfig):
         """Test that enum values are preserved through serialization.
-        
+
         **Validates: Requirements 1.1, 1.2**
         """
         # Serialize and deserialize
@@ -300,7 +300,7 @@ class TestConfigurationRoundTrip:
     @given(tenant_config_strategy())
     def test_optional_fields_preservation(self, config: TenantConfig):
         """Test that optional fields (None values) are preserved.
-        
+
         **Validates: Requirements 1.1, 1.2**
         """
         # Serialize and deserialize

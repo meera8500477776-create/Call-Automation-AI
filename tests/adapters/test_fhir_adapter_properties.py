@@ -112,10 +112,10 @@ def fhir_adapter():
 class TestProperty9AppointmentSlotValidity:
     """
     **Property 9: Appointment slot validity**
-    
+
     For any appointment search, all returned slots should be within
     the requested date range.
-    
+
     **Validates: Requirements 3.2**
     """
 
@@ -244,10 +244,10 @@ class TestProperty9AppointmentSlotValidity:
 class TestProperty10ConstraintEnforcement:
     """
     **Property 10: Constraint enforcement**
-    
+
     For any appointment, rescheduling or canceling should only succeed
     if the corresponding constraint flag is true.
-    
+
     **Validates: Requirements 3.5**
     """
 

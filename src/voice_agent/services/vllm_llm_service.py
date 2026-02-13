@@ -26,11 +26,11 @@ logger = logging.getLogger(__name__)
 class vLLMLLMService(LLMService):
     """
     vLLM-based LLM service implementation.
-    
+
     Provides high-performance local LLM deployment with PagedAttention for
     efficient memory management, continuous batching for high throughput,
     and GPU resource management for production workloads.
-    
+
     Key features:
     - PagedAttention: Efficient KV cache management
     - Continuous batching: High throughput request processing
@@ -49,7 +49,7 @@ class vLLMLLMService(LLMService):
     ):
         """
         Initialize vLLM LLM service.
-        
+
         Args:
             config: LLM configuration
             base_url: vLLM server base URL (OpenAI-compatible API)
@@ -82,7 +82,7 @@ class vLLMLLMService(LLMService):
     async def _get_session(self) -> aiohttp.ClientSession:
         """
         Get or create aiohttp session.
-        
+
         Returns:
             Active aiohttp session
         """
@@ -100,7 +100,7 @@ class vLLMLLMService(LLMService):
     async def check_server_availability(self) -> bool:
         """
         Check if vLLM server is available and responsive.
-        
+
         Returns:
             True if server is available, False otherwise
         """
@@ -146,18 +146,18 @@ class vLLMLLMService(LLMService):
     ) -> LLMResponse:
         """
         Generate response from user transcript using vLLM.
-        
+
         Leverages PagedAttention and continuous batching for efficient
         high-throughput inference. Falls back to alternative service if
         vLLM server is unavailable.
-        
+
         Args:
             transcript: User's transcribed speech
             context: Conversation context
-            
+
         Returns:
             Complete LLM response with intent, parameters, and text
-            
+
         Raises:
             RuntimeError: If both vLLM and fallback service fail
         """
@@ -205,16 +205,16 @@ class vLLMLLMService(LLMService):
     async def _call_vllm(self, prompt: str) -> str:
         """
         Call vLLM API to generate response.
-        
+
         Uses OpenAI-compatible API endpoint with vLLM-specific optimizations
         including PagedAttention and continuous batching.
-        
+
         Args:
             prompt: Complete prompt including system instructions
-            
+
         Returns:
             Generated response text
-            
+
         Raises:
             RuntimeError: If API call fails
         """
@@ -270,11 +270,11 @@ class vLLMLLMService(LLMService):
     ) -> str:
         """
         Build prompt for vLLM with voice-optimized instructions.
-        
+
         Args:
             transcript: Current user transcript
             context: Conversation context
-            
+
         Returns:
             Complete prompt string
         """
@@ -299,13 +299,13 @@ Assistant:"""
     def _build_voice_optimized_system_prompt(self) -> str:
         """
         Build voice-optimized system prompt.
-        
+
         Incorporates requirements for voice-only responses:
         - No markdown, tables, or bullet points
         - Maximum 3 sentences per response
         - Empathetic, conversational language
         - Explicit knowledge boundaries
-        
+
         Returns:
             Voice-optimized system prompt
         """
@@ -336,14 +336,14 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     ) -> LLMResponse:
         """
         Parse vLLM response into LLMResponse format.
-        
+
         Extracts intent and parameters from the response text and
         original transcript using the base class methods.
-        
+
         Args:
             response_text: Generated response from vLLM
             original_transcript: Original user transcript
-            
+
         Returns:
             Parsed LLM response
         """
@@ -385,13 +385,13 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     def _extract_emotional_tags(self, text: str) -> list[str]:
         """
         Extract emotional tags for TTS from response text.
-        
+
         Looks for emotional indicators in the text that can be
         used by TTS services for more natural speech synthesis.
-        
+
         Args:
             text: Response text
-            
+
         Returns:
             List of emotional tags
         """

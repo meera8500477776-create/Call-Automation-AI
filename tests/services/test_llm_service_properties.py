@@ -179,10 +179,10 @@ class TestLLMServiceProperties:
     def test_intent_classification_consistency(self, transcript):
         """
         Property 4: Intent classification consistency.
-        
+
         For any transcript, classifying intent multiple times should return
         the same intent (deterministic with temperature=0).
-        
+
         **Validates: Requirements 10.2**
         """
         llm_service = create_llm_service()
@@ -211,10 +211,10 @@ class TestLLMServiceProperties:
     def test_voice_optimized_no_markdown(self, response_text):
         """
         Property 5a: Voice-optimized responses remove markdown.
-        
+
         For any LLM response, format_for_voice() should remove all markdown
         formatting including bold, italic, code, headers, and links.
-        
+
         **Validates: Requirements 6.1**
         """
         llm_service = create_llm_service()
@@ -240,10 +240,10 @@ class TestLLMServiceProperties:
     def test_voice_optimized_sentence_limit(self, response_text):
         """
         Property 5b: Voice-optimized responses limit to 3 sentences.
-        
+
         For any LLM response, format_for_voice() should limit the output
         to 3 sentences or fewer.
-        
+
         **Validates: Requirements 6.2**
         """
         llm_service = create_llm_service()
@@ -266,10 +266,10 @@ class TestLLMServiceProperties:
     def test_voice_optimized_no_tables_or_bullets(self, response_text):
         """
         Property 5c: Voice-optimized responses remove tables and bullet points.
-        
+
         For any LLM response, format_for_voice() should remove tables
         (lines with pipes) and bullet points.
-        
+
         **Validates: Requirements 6.3**
         """
         llm_service = create_llm_service()
@@ -297,7 +297,7 @@ class TestLLMServiceProperties:
     def test_format_for_voice_always_returns_string(self, response_text):
         """
         Property: format_for_voice always returns a string.
-        
+
         For any input text, format_for_voice() should always return a string
         (never None or other types).
         """
@@ -313,7 +313,7 @@ class TestLLMServiceProperties:
     def test_format_for_voice_idempotent(self, response_text):
         """
         Property: format_for_voice is idempotent.
-        
+
         Applying format_for_voice() multiple times should produce the same result
         as applying it once (idempotent operation).
         """
@@ -331,7 +331,7 @@ class TestLLMServiceProperties:
     def test_intent_confidence_in_valid_range(self, transcript):
         """
         Property: Intent confidence is always in valid range [0.0, 1.0].
-        
+
         For any transcript, the classified intent should have a confidence
         score between 0.0 and 1.0 inclusive.
         """
@@ -347,7 +347,7 @@ class TestLLMServiceProperties:
     def test_intent_tool_consistency(self, transcript):
         """
         Property: Intent tool requirements are consistent.
-        
+
         If an intent requires a tool, it must have a tool_name.
         If it doesn't require a tool, tool_name should be None.
         """
@@ -368,7 +368,7 @@ class TestLLMServiceProperties:
     def test_parameter_extraction_returns_dict(self, transcript):
         """
         Property: Parameter extraction always returns a dictionary.
-        
+
         For any transcript and intent, extract_parameters() should always
         return a dictionary (possibly empty).
         """
@@ -390,7 +390,7 @@ class TestLLMServiceProperties:
     ):
         """
         Property: Different transcripts can produce different intents.
-        
+
         The intent classification system should be able to distinguish
         between different types of requests (not always return the same intent).
         """
@@ -419,10 +419,10 @@ class TestOpenAILLMServiceProperties:
     async def test_openai_intent_classification_deterministic(self, transcript):
         """
         Property 4: OpenAI intent classification is deterministic with temperature=0.
-        
+
         When using OpenAI with temperature=0, the same transcript should
         produce consistent intent classifications.
-        
+
         **Validates: Requirements 10.2**
         """
         from src.voice_agent.services.openai_llm_service import OpenAILLMService

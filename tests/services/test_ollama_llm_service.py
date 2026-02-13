@@ -410,7 +410,7 @@ class TestVoiceOptimization:
 
         # Response with markdown and long text
         raw_response = """**Hello!** I'm here to help you.
-        
+
 - First point
 - Second point
 - Third point

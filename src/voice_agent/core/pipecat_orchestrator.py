@@ -37,7 +37,7 @@ class CallMetadata:
 class PipecatOrchestrator:
     """
     Pipecat Orchestrator integrating all voice agent components.
-    
+
     **Validates: Requirements 1.3, 1.4, 11.5**
     """
 
@@ -143,21 +143,21 @@ class PipecatOrchestrator:
     ) -> VoicePipeline:
         """
         Start a new voice session.
-        
+
         Creates session, routes to tenant, initializes pipeline, and starts it.
-        
+
         Args:
             session_id: Unique session identifier
             caller_id: Caller identification
             call_metadata: Call metadata
-            
+
         Returns:
             Initialized and started VoicePipeline
-            
+
         Raises:
             KeyError: If caller cannot be routed to tenant
             RuntimeError: If pipeline initialization fails
-            
+
         **Validates: Requirements 1.3, 1.4, 11.5**
         """
         logger.info("Starting session: %s for caller: %s", session_id, caller_id)
@@ -167,7 +167,7 @@ class PipecatOrchestrator:
             tenant_config = self.route_call(caller_id, call_metadata)
 
             # Create session
-            session = self._session_manager.create_session(
+            self._session_manager.create_session(
                 tenant_id=tenant_config.tenant_id,
                 caller_id=caller_id,
                 session_id=session_id,
@@ -205,16 +205,16 @@ class PipecatOrchestrator:
     ) -> dict[str, Any] | None:
         """
         Stop a voice session and cleanup resources.
-        
+
         Shuts down pipeline, ends session, and optionally persists logs.
-        
+
         Args:
             session_id: Session identifier to stop
             persist: Whether to persist session data (default: True)
-            
+
         Returns:
             Session summary dictionary, or None if session not found
-            
+
         **Validates: Requirements 11.5, 11.6**
         """
         logger.info("Stopping session: %s (persist=%s)", session_id, persist)
@@ -250,10 +250,10 @@ class PipecatOrchestrator:
     def get_active_pipeline(self, session_id: str) -> VoicePipeline | None:
         """
         Get active pipeline for a session.
-        
+
         Args:
             session_id: Session identifier
-            
+
         Returns:
             VoicePipeline if active, None otherwise
         """
@@ -262,7 +262,7 @@ class PipecatOrchestrator:
     def get_active_session_ids(self) -> list[str]:
         """
         Get list of active session IDs.
-        
+
         Returns:
             List of active session identifiers
         """
@@ -271,7 +271,7 @@ class PipecatOrchestrator:
     def get_session_count(self) -> int:
         """
         Get count of active sessions.
-        
+
         Returns:
             Number of active sessions
         """

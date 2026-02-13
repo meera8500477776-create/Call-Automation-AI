@@ -59,10 +59,10 @@ class RescheduleWorkflowParameters:
 class AppointmentReschedulingWorkflow:
     """
     Multi-turn conversation workflow for appointment rescheduling.
-    
+
     Handles existing appointment lookup, constraint checking, new slot search,
     confirmation, and rescheduling through natural conversation flow.
-    
+
     Requirements:
     - 10.7: Multi-turn workflow requiring multiple pieces of information
     - 3.5: FHIR adapter integration for rescheduling with constraint checking
@@ -71,7 +71,7 @@ class AppointmentReschedulingWorkflow:
     def __init__(self, fhir_adapter: FHIRAdapter):
         """
         Initialize the appointment rescheduling workflow.
-        
+
         Args:
             fhir_adapter: FHIR adapter for EHR integration
         """
@@ -86,12 +86,12 @@ class AppointmentReschedulingWorkflow:
     ) -> str:
         """
         Process a conversation turn in the rescheduling workflow.
-        
+
         Args:
             session: Current conversation session
             user_transcript: User's transcribed speech
             extracted_params: Parameters extracted from user input
-            
+
         Returns:
             Agent response text for this turn
         """
@@ -190,7 +190,7 @@ class AppointmentReschedulingWorkflow:
             # Search for upcoming appointments for this patient
             # Look for appointments in the next 90 days
             today = date.today()
-            date_range = DateRange(start=today, end=today + timedelta(days=90))
+            DateRange(start=today, end=today + timedelta(days=90))
 
             # Use find_appointments to get available slots, then filter for booked ones
             # In a real implementation, we'd have a separate method to get existing appointments
@@ -391,10 +391,10 @@ class AppointmentReschedulingWorkflow:
     def _parse_date_to_range(self, date_str: str) -> DateRange:
         """
         Parse a date string to a DateRange.
-        
+
         Args:
             date_str: Date string (e.g., "tomorrow", "Monday", "January 15")
-            
+
         Returns:
             DateRange for searching appointments
         """
@@ -429,11 +429,11 @@ class AppointmentReschedulingWorkflow:
     def _find_best_slot(self, slots: list[Slot], preferred_time: str | None) -> Slot:
         """
         Find the best matching slot based on preferred time.
-        
+
         Args:
             slots: List of available slots
             preferred_time: Preferred time string (e.g., "2pm", "morning")
-            
+
         Returns:
             Best matching slot
         """

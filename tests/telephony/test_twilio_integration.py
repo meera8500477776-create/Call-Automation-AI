@@ -535,10 +535,10 @@ class TestTwilioIntegrationEdgeCases:
 
 class TestTwilioIntegrationIntegration:
     """Integration tests for Twilio integration.
-    
+
     Tests WebSocket connection establishment, bidirectional audio streaming,
     and complete call lifecycle scenarios.
-    
+
     **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
     """
 
@@ -546,7 +546,7 @@ class TestTwilioIntegrationIntegration:
     async def test_websocket_connection_establishment(self, twilio_integration, mock_websocket):
         """
         Test WebSocket connection establishment with mock Twilio.
-        
+
         **Validates: Requirement 11.1**
         """
         with patch("voice_agent.telephony.twilio_integration.websockets.connect") as mock_connect:
@@ -577,7 +577,7 @@ class TestTwilioIntegrationIntegration:
     async def test_websocket_connection_failure_handling(self, twilio_integration):
         """
         Test WebSocket connection failure handling.
-        
+
         **Validates: Requirement 11.1**
         """
         error_callback = MagicMock()
@@ -599,7 +599,7 @@ class TestTwilioIntegrationIntegration:
     async def test_bidirectional_audio_streaming(self, twilio_integration):
         """
         Test audio streaming in both directions (Twilio -> Integration -> Twilio).
-        
+
         **Validates: Requirements 11.2, 11.3**
         """
         # Create a mock websocket that properly handles recv
@@ -689,7 +689,7 @@ class TestTwilioIntegrationIntegration:
     async def test_complete_call_lifecycle(self, twilio_integration):
         """
         Test complete call lifecycle: initiation, active, termination.
-        
+
         **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
         """
         # Create a mock websocket that properly handles recv
@@ -824,7 +824,7 @@ class TestTwilioIntegrationIntegration:
     async def test_call_lifecycle_with_dtmf(self, twilio_integration):
         """
         Test call lifecycle with DTMF tone detection.
-        
+
         **Validates: Requirements 11.1, 11.4**
         """
         # Create a mock websocket that properly handles recv
@@ -886,7 +886,7 @@ class TestTwilioIntegrationIntegration:
     async def test_concurrent_audio_streaming(self, twilio_integration):
         """
         Test concurrent audio streaming doesn't cause race conditions.
-        
+
         **Validates: Requirements 11.2, 11.3**
         """
         # Create a mock websocket that properly handles recv
@@ -955,7 +955,7 @@ class TestTwilioIntegrationIntegration:
     async def test_call_lifecycle_with_error_recovery(self, twilio_integration):
         """
         Test call lifecycle with error recovery.
-        
+
         **Validates: Requirements 11.1, 11.4**
         """
         # Create a mock websocket that properly handles recv
@@ -1028,7 +1028,7 @@ class TestTwilioIntegrationIntegration:
     async def test_multiple_call_sessions(self, twilio_config):
         """
         Test handling multiple sequential call sessions.
-        
+
         **Validates: Requirements 11.1, 11.4**
         """
         # Create a mock websocket that properly handles recv

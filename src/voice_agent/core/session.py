@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 class ConversationTurn(BaseModel):
     """Represents a single turn in a conversation.
-    
+
     A turn captures one exchange in the conversation, including the speaker,
     transcript, intent classification, extracted parameters, and any tool calls made.
     """
@@ -52,7 +52,7 @@ class ConversationTurn(BaseModel):
 
 class Session(BaseModel):
     """Represents a complete conversation session.
-    
+
     A session tracks the entire lifecycle of a call, including conversation history,
     extracted parameters across turns, current workflow state, and session metadata.
     """
@@ -102,7 +102,7 @@ class Session(BaseModel):
 
     def add_turn(self, turn: ConversationTurn) -> None:
         """Add a conversation turn to the session history.
-        
+
         Args:
             turn: The conversation turn to add
         """
@@ -123,7 +123,7 @@ class Session(BaseModel):
 
     def is_active(self) -> bool:
         """Check if the session is currently active.
-        
+
         Returns:
             True if the session is active (not ended), False otherwise
         """
@@ -131,7 +131,7 @@ class Session(BaseModel):
 
     def get_turn_count(self) -> int:
         """Get the total number of turns in this session.
-        
+
         Returns:
             Number of conversation turns
         """
@@ -139,7 +139,7 @@ class Session(BaseModel):
 
     def get_last_turn(self) -> ConversationTurn | None:
         """Get the most recent conversation turn.
-        
+
         Returns:
             The last conversation turn, or None if no turns exist
         """

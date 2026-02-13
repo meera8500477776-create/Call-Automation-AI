@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BridgeConfig:
     """Configuration for Twilio-Voice Pipeline bridge.
-    
+
     Attributes:
         session_id: Unique session identifier
         enable_audio_logging: Enable logging of audio data (for debugging)
@@ -38,10 +38,10 @@ class BridgeConfig:
 class TwilioVoiceBridge:
     """
     Bridge connecting Twilio telephony to Voice Pipeline.
-    
+
     Handles bidirectional audio streaming, session lifecycle management,
     and event coordination between Twilio and the voice processing pipeline.
-    
+
     **Validates: Requirements 11.2, 11.3, 11.5, 11.6**
     """
 
@@ -53,7 +53,7 @@ class TwilioVoiceBridge:
     ):
         """
         Initialize Twilio-Voice Pipeline bridge.
-        
+
         Args:
             config: Bridge configuration
             twilio_integration: Twilio integration instance
@@ -84,10 +84,10 @@ class TwilioVoiceBridge:
     async def start(self) -> None:
         """
         Start the bridge and wire up connections.
-        
+
         Registers callbacks for Twilio events and initializes the voice pipeline
         when a call starts.
-        
+
         **Validates: Requirements 11.2, 11.3, 11.5**
         """
         if self._is_active:
@@ -108,7 +108,7 @@ class TwilioVoiceBridge:
     async def stop(self) -> None:
         """
         Stop the bridge and cleanup resources.
-        
+
         **Validates: Requirements 11.6**
         """
         if not self._is_active:
@@ -140,12 +140,12 @@ class TwilioVoiceBridge:
     def _handle_call_started(self, call_metadata: TwilioCallMetadata) -> None:
         """
         Handle call started event from Twilio.
-        
+
         Creates a new session and initializes the voice pipeline.
-        
+
         Args:
             call_metadata: Metadata from Twilio about the call
-            
+
         **Validates: Requirements 11.5**
         """
         logger.info(
@@ -175,7 +175,7 @@ class TwilioVoiceBridge:
     async def _start_session(self, call_metadata: OrchestratorCallMetadata) -> None:
         """
         Start voice pipeline session.
-        
+
         Args:
             call_metadata: Call metadata for session creation
         """
@@ -202,12 +202,12 @@ class TwilioVoiceBridge:
     def _handle_call_ended(self, call_metadata: TwilioCallMetadata) -> None:
         """
         Handle call ended event from Twilio.
-        
+
         Cleans up the session and stops the voice pipeline.
-        
+
         Args:
             call_metadata: Metadata from Twilio about the ended call
-            
+
         **Validates: Requirements 11.6**
         """
         logger.info(
@@ -243,12 +243,12 @@ class TwilioVoiceBridge:
     def _handle_twilio_audio(self, audio_data: bytes) -> None:
         """
         Handle incoming audio from Twilio.
-        
+
         Routes audio to the voice pipeline for processing.
-        
+
         Args:
             audio_data: Raw audio bytes from Twilio (mulaw/pcm)
-            
+
         **Validates: Requirements 11.2**
         """
         if not self._pipeline or not self._pipeline.is_active:
@@ -264,7 +264,7 @@ class TwilioVoiceBridge:
     async def _route_audio_to_pipeline(self, audio_data: bytes) -> None:
         """
         Route audio data to voice pipeline.
-        
+
         Args:
             audio_data: Audio bytes to route
         """
@@ -277,12 +277,12 @@ class TwilioVoiceBridge:
     def _handle_pipeline_audio(self, audio_data: bytes) -> None:
         """
         Handle generated audio from voice pipeline.
-        
+
         Routes audio to Twilio for playback to the caller.
-        
+
         Args:
             audio_data: Generated audio bytes from TTS
-            
+
         **Validates: Requirements 11.3**
         """
         if not self._twilio.is_connected:
@@ -298,7 +298,7 @@ class TwilioVoiceBridge:
     async def _route_audio_to_twilio(self, audio_data: bytes) -> None:
         """
         Route audio data to Twilio.
-        
+
         Args:
             audio_data: Audio bytes to route
         """
@@ -311,7 +311,7 @@ class TwilioVoiceBridge:
     def _handle_latency_metrics(self, metrics: LatencyMetrics) -> None:
         """
         Handle latency metrics from voice pipeline.
-        
+
         Args:
             metrics: Latency metrics from pipeline
         """
@@ -326,7 +326,7 @@ class TwilioVoiceBridge:
     def _handle_twilio_error(self, error: Exception) -> None:
         """
         Handle error from Twilio integration.
-        
+
         Args:
             error: Exception from Twilio
         """
@@ -338,7 +338,7 @@ class TwilioVoiceBridge:
     def get_session_id(self) -> str:
         """
         Get current session ID.
-        
+
         Returns:
             Session identifier
         """
@@ -347,7 +347,7 @@ class TwilioVoiceBridge:
     def get_call_metadata(self) -> TwilioCallMetadata | None:
         """
         Get current call metadata from Twilio.
-        
+
         Returns:
             Call metadata if available, None otherwise
         """
@@ -356,7 +356,7 @@ class TwilioVoiceBridge:
     def get_pipeline_metrics(self) -> LatencyMetrics | None:
         """
         Get current pipeline latency metrics.
-        
+
         Returns:
             Latency metrics if pipeline is active, None otherwise
         """

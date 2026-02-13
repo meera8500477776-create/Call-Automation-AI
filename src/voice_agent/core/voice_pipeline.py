@@ -39,10 +39,10 @@ class PipelineState(Enum):
 class LatencyMetrics:
     """
     Latency metrics for pipeline stages.
-    
+
     Tracks timing for each stage of the voice pipeline to monitor
     performance and identify bottlenecks.
-    
+
     **Validates: Requirements 2.1, 2.2, 2.7**
     """
     stt_latency_ms: float = 0.0
@@ -70,10 +70,10 @@ class LatencyMetrics:
 class StreamingConfig:
     """
     Configuration for streaming optimizations.
-    
+
     Controls concurrent processing, buffering, and flow control
     for the voice pipeline.
-    
+
     **Validates: Requirements 2.1, 2.2, 2.3**
     """
     enable_concurrent_processing: bool = True
@@ -90,7 +90,7 @@ class StreamingConfig:
 class PipelineConfig:
     """
     Configuration for voice pipeline.
-    
+
     Attributes:
         session_id: Unique session identifier
         stt_config: STT service configuration
@@ -118,12 +118,12 @@ class PipelineConfig:
 class VoicePipeline:
     """
     Voice Pipeline orchestrator coordinating STT, LLM, TTS, and VAD.
-    
+
     Manages the real-time audio processing chain from audio input through
     speech recognition, language understanding, response generation, and
     speech synthesis. Supports concurrent processing stages, barge-in
     capability, and streaming optimizations for ultra-low latency.
-    
+
     Pipeline flow:
         Audio Input → VAD → STT → LLM → TTS → Audio Output
     """
@@ -131,7 +131,7 @@ class VoicePipeline:
     def __init__(self, config: PipelineConfig):
         """
         Initialize voice pipeline.
-        
+
         Args:
             config: Pipeline configuration including all component configs
         """
@@ -213,7 +213,7 @@ class VoicePipeline:
     async def initialize(self) -> None:
         """
         Initialize pipeline components and establish connections.
-        
+
         Raises:
             RuntimeError: If initialization fails
         """
@@ -308,7 +308,7 @@ class VoicePipeline:
     def on_transcript(self, callback: Callable[[str, bool], None]) -> None:
         """
         Register callback for transcript events.
-        
+
         Args:
             callback: Function to call with (transcript, is_final) when transcript arrives
         """
@@ -318,7 +318,7 @@ class VoicePipeline:
     def on_llm_response(self, callback: Callable[[LLMResponse], None]) -> None:
         """
         Register callback for LLM response events.
-        
+
         Args:
             callback: Function to call with LLMResponse when LLM generates response
         """
@@ -328,7 +328,7 @@ class VoicePipeline:
     def on_audio_generated(self, callback: Callable[[bytes], None]) -> None:
         """
         Register callback for TTS audio generation events.
-        
+
         Args:
             callback: Function to call with audio bytes when TTS generates audio
         """
@@ -338,7 +338,7 @@ class VoicePipeline:
     def on_latency_metric(self, callback: Callable[[LatencyMetrics], None]) -> None:
         """
         Register callback for latency metric events.
-        
+
         Args:
             callback: Function to call with LatencyMetrics when metrics are recorded
         """
@@ -348,9 +348,9 @@ class VoicePipeline:
     def enable_barge_in(self, enabled: bool = True) -> None:
         """
         Enable or disable barge-in capability.
-        
+
         When enabled, user speech will interrupt agent speech output.
-        
+
         Args:
             enabled: True to enable barge-in, False to disable
         """
@@ -360,7 +360,7 @@ class VoicePipeline:
     def _start_latency_timer(self, stage: str) -> None:
         """
         Start latency timer for a pipeline stage.
-        
+
         Args:
             stage: Stage name (stt, llm, tts, end_to_end)
         """
@@ -370,10 +370,10 @@ class VoicePipeline:
     def _end_latency_timer(self, stage: str) -> float:
         """
         End latency timer for a pipeline stage and return duration.
-        
+
         Args:
             stage: Stage name (stt, llm, tts, end_to_end)
-            
+
         Returns:
             Duration in milliseconds
         """
@@ -389,7 +389,7 @@ class VoicePipeline:
     def _record_latency(self, stage: str, duration_ms: float) -> None:
         """
         Record latency for a pipeline stage.
-        
+
         Args:
             stage: Stage name
             duration_ms: Duration in milliseconds
@@ -412,7 +412,7 @@ class VoicePipeline:
     def get_latency_metrics(self) -> LatencyMetrics:
         """
         Get current latency metrics.
-        
+
         Returns:
             Current latency metrics
         """
@@ -421,7 +421,7 @@ class VoicePipeline:
     def _check_backpressure(self) -> bool:
         """
         Check if audio queue is experiencing backpressure.
-        
+
         Returns:
             True if backpressure threshold exceeded
         """
@@ -434,14 +434,14 @@ class VoicePipeline:
     async def process_audio_chunk(self, audio_data: bytes) -> None:
         """
         Process incoming audio chunk through the pipeline.
-        
+
         Handles audio buffering, VAD processing, and STT streaming.
         Implements barge-in detection when enabled. Includes flow control
         to prevent buffer overflow.
-        
+
         Args:
             audio_data: Raw audio data bytes (16-bit PCM)
-            
+
         Raises:
             RuntimeError: If pipeline is not active
             ValueError: If audio data is invalid
@@ -495,7 +495,7 @@ class VoicePipeline:
     async def _handle_interim_transcript(self, transcript: str, metadata: dict[str, Any]) -> None:
         """
         Handle interim transcript from STT service.
-        
+
         Args:
             transcript: Interim transcript text
             metadata: Transcript metadata
@@ -518,10 +518,10 @@ class VoicePipeline:
     async def _handle_final_transcript(self, transcript: str, metadata: dict[str, Any]) -> None:
         """
         Handle final transcript from STT service.
-        
+
         Triggers LLM processing and response generation.
         Tracks STT latency.
-        
+
         Args:
             transcript: Final transcript text
             metadata: Transcript metadata
@@ -552,10 +552,10 @@ class VoicePipeline:
     async def _process_llm(self, transcript: str) -> None:
         """
         Process transcript through LLM and generate response.
-        
+
         Uses semaphore for concurrent request control and tracks
         LLM latency (TTFT and total).
-        
+
         Args:
             transcript: User transcript to process
         """
@@ -619,10 +619,10 @@ class VoicePipeline:
     async def _generate_audio(self, llm_response: LLMResponse) -> None:
         """
         Generate audio from LLM response using TTS.
-        
+
         Tracks TTS latency (TTFB and total) and uses semaphore
         for concurrent request control.
-        
+
         Args:
             llm_response: LLM response to synthesize
         """
@@ -689,9 +689,9 @@ class VoicePipeline:
     async def _stream_tts_audio(self, text: str) -> None:
         """
         Stream TTS audio chunks.
-        
+
         Tracks TTFB (time to first byte) for the first audio chunk.
-        
+
         Args:
             text: Text to synthesize
         """
@@ -727,7 +727,7 @@ class VoicePipeline:
     def _handle_speech_start(self, timestamp: float) -> None:
         """
         Handle speech start event from VAD.
-        
+
         Args:
             timestamp: Timestamp when speech started
         """
@@ -740,7 +740,7 @@ class VoicePipeline:
     def _handle_speech_end(self, timestamp: float) -> None:
         """
         Handle speech end event from VAD.
-        
+
         Args:
             timestamp: Timestamp when speech ended
         """
@@ -749,7 +749,7 @@ class VoicePipeline:
     def _handle_stt_error(self, error: Exception) -> None:
         """
         Handle STT service error.
-        
+
         Args:
             error: Exception from STT service
         """
@@ -759,7 +759,7 @@ class VoicePipeline:
     def get_context(self) -> ConversationContext:
         """
         Get current conversation context.
-        
+
         Returns:
             Current conversation context
         """
@@ -768,7 +768,7 @@ class VoicePipeline:
     def update_context(self, **kwargs) -> None:
         """
         Update conversation context fields.
-        
+
         Args:
             **kwargs: Fields to update in context
         """

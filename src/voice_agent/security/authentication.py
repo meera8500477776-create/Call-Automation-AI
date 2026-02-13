@@ -53,7 +53,7 @@ class AuthenticationService:
     """
     Authentication service providing OAuth 2.0 client credentials flow,
     token caching, automatic refresh, and validation.
-    
+
     Requirements:
     - 3.1: OAuth 2.0 authentication with scoped access tokens
     - 7.8: OAuth 2.0 authentication for all external API access
@@ -62,7 +62,7 @@ class AuthenticationService:
     def __init__(self, timeout: int = 30):
         """
         Initialize the authentication service.
-        
+
         Args:
             timeout: HTTP request timeout in seconds (default: 30)
         """
@@ -73,11 +73,11 @@ class AuthenticationService:
     def _generate_cache_key(self, client_id: str, scopes: list[str]) -> str:
         """
         Generate a cache key for a client ID and scopes combination.
-        
+
         Args:
             client_id: OAuth client ID
             scopes: List of OAuth scopes
-            
+
         Returns:
             Cache key string
         """
@@ -95,20 +95,20 @@ class AuthenticationService:
     ) -> AccessToken:
         """
         Get an access token using OAuth 2.0 client credentials flow.
-        
+
         This method implements token caching and will return a cached token
         if available and not expired. Otherwise, it will request a new token.
-        
+
         Args:
             token_url: OAuth token endpoint URL
             client_id: OAuth client ID
             client_secret: OAuth client secret
             scopes: List of OAuth scopes to request
             additional_params: Optional additional parameters for the token request
-            
+
         Returns:
             AccessToken with token and metadata
-            
+
         Raises:
             ValueError: If token request fails or returns invalid response
             aiohttp.ClientError: If HTTP request fails
@@ -199,16 +199,16 @@ class AuthenticationService:
     ) -> AccessToken:
         """
         Refresh an expired access token using a refresh token.
-        
+
         Args:
             token_url: OAuth token endpoint URL
             client_id: OAuth client ID
             client_secret: OAuth client secret
             refresh_token: Refresh token from previous token response
-            
+
         Returns:
             New AccessToken with refreshed token
-            
+
         Raises:
             ValueError: If refresh request fails or returns invalid response
             aiohttp.ClientError: If HTTP request fails
@@ -262,17 +262,17 @@ class AuthenticationService:
     ) -> TokenValidation:
         """
         Validate an access token.
-        
+
         If introspection_url is provided, performs server-side validation using
         OAuth 2.0 token introspection (RFC 7662). Otherwise, performs basic
         local validation by checking if the token exists in cache and is not expired.
-        
+
         Args:
             token: Access token to validate
             introspection_url: Optional OAuth introspection endpoint URL
             client_id: Optional OAuth client ID (required for introspection)
             client_secret: Optional OAuth client secret (required for introspection)
-            
+
         Returns:
             TokenValidation with validation result
         """
@@ -322,13 +322,13 @@ class AuthenticationService:
     ) -> TokenValidation:
         """
         Perform server-side token introspection (RFC 7662).
-        
+
         Args:
             introspection_url: OAuth introspection endpoint URL
             token: Access token to introspect
             client_id: OAuth client ID
             client_secret: OAuth client secret
-            
+
         Returns:
             TokenValidation with introspection result
         """
@@ -396,14 +396,14 @@ class AuthenticationService:
     ) -> bool:
         """
         Revoke an access or refresh token (RFC 7009).
-        
+
         Args:
             revocation_url: OAuth revocation endpoint URL
             token: Token to revoke
             client_id: OAuth client ID
             client_secret: OAuth client secret
             token_type_hint: Optional hint about token type ("access_token" or "refresh_token")
-            
+
         Returns:
             True if revocation succeeded, False otherwise
         """
@@ -451,11 +451,11 @@ class AuthenticationService:
     def get_cached_token(self, client_id: str, scopes: list[str]) -> AccessToken | None:
         """
         Get a cached token without making any network requests.
-        
+
         Args:
             client_id: OAuth client ID
             scopes: List of OAuth scopes
-            
+
         Returns:
             Cached AccessToken if available and not expired, None otherwise
         """

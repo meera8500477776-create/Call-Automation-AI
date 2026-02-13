@@ -740,7 +740,7 @@ class TestWorkflowVariousScenarios:
         )
 
         # User says no to first option
-        response = await workflow.process_turn(
+        await workflow.process_turn(
             test_session,
             "no, I want a different time",
             {}
@@ -763,7 +763,7 @@ class TestWorkflowVariousScenarios:
 
         # After providing time, should ask for reason (optional)
         # Then search and present slot
-        response = await workflow.process_turn(
+        await workflow.process_turn(
             test_session,
             "annual checkup",
             {"reason": "annual checkup"}

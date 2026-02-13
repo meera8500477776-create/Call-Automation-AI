@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class TenantRegistry:
     """Registry for loading and managing tenant configurations.
-    
+
     Provides:
     - Configuration loading from YAML/TOML files
     - Caller ID to tenant mapping
@@ -26,7 +26,7 @@ class TenantRegistry:
 
     def __init__(self, config_dir: Path, caller_mapping: dict[str, str] | None = None):
         """Initialize the tenant registry.
-        
+
         Args:
             config_dir: Directory containing tenant configuration files
             caller_mapping: Optional mapping of caller IDs to tenant IDs
@@ -43,15 +43,15 @@ class TenantRegistry:
 
     def load_tenant_config(self, tenant_id: str) -> TenantConfig:
         """Load tenant configuration from file.
-        
+
         Checks cache first, then loads from file if not cached.
-        
+
         Args:
             tenant_id: Unique tenant identifier
-            
+
         Returns:
             Validated TenantConfig object
-            
+
         Raises:
             FileNotFoundError: If configuration file not found
             ValueError: If configuration is invalid
@@ -74,13 +74,13 @@ class TenantRegistry:
 
     def _load_config_from_file(self, tenant_id: str) -> TenantConfig:
         """Load configuration from file without caching.
-        
+
         Args:
             tenant_id: Unique tenant identifier
-            
+
         Returns:
             Validated TenantConfig object
-            
+
         Raises:
             FileNotFoundError: If configuration file not found
             ValueError: If configuration is invalid
@@ -97,13 +97,13 @@ class TenantRegistry:
 
     def get_tenant_by_caller(self, caller_id: str) -> str:
         """Map caller ID to tenant ID.
-        
+
         Args:
             caller_id: Caller identification (phone number, etc.)
-            
+
         Returns:
             Tenant ID associated with the caller
-            
+
         Raises:
             KeyError: If caller ID is not mapped to any tenant
         """
@@ -114,12 +114,12 @@ class TenantRegistry:
 
     def reload_config(self, tenant_id: str) -> None:
         """Hot-reload configuration for a specific tenant.
-        
+
         Reloads configuration from file and updates cache.
-        
+
         Args:
             tenant_id: Unique tenant identifier
-            
+
         Raises:
             FileNotFoundError: If configuration file not found
             ValueError: If configuration is invalid
@@ -137,7 +137,7 @@ class TenantRegistry:
 
     def start_watching(self) -> None:
         """Start watching configuration directory for file changes.
-        
+
         Automatically reloads configurations when files are modified.
         """
         if self._observer is not None:
@@ -172,7 +172,7 @@ class TenantRegistry:
 
     def get_cached_tenant_ids(self) -> list[str]:
         """Get list of tenant IDs currently in cache.
-        
+
         Returns:
             List of cached tenant IDs
         """
@@ -181,7 +181,7 @@ class TenantRegistry:
 
     def add_caller_mapping(self, caller_id: str, tenant_id: str) -> None:
         """Add a caller ID to tenant ID mapping.
-        
+
         Args:
             caller_id: Caller identification
             tenant_id: Tenant ID to map to
@@ -191,7 +191,7 @@ class TenantRegistry:
 
     def remove_caller_mapping(self, caller_id: str) -> None:
         """Remove a caller ID mapping.
-        
+
         Args:
             caller_id: Caller identification to remove
         """
@@ -205,7 +205,7 @@ class _ConfigFileHandler(FileSystemEventHandler):
 
     def __init__(self, registry: TenantRegistry):
         """Initialize the file handler.
-        
+
         Args:
             registry: TenantRegistry instance to notify of changes
         """
@@ -216,7 +216,7 @@ class _ConfigFileHandler(FileSystemEventHandler):
 
     def on_modified(self, event: FileSystemEvent) -> None:
         """Handle file modification events.
-        
+
         Args:
             event: File system event
         """

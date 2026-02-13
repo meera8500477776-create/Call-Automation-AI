@@ -35,7 +35,7 @@ class ScalingPolicy:
 class ScalingController:
     """
     Controller for managing KEDA-based auto-scaling of GPU resources.
-    
+
     This controller analyzes system load metrics and makes scaling decisions
     to optimize resource utilization and cost while maintaining performance.
     """
@@ -43,7 +43,7 @@ class ScalingController:
     def __init__(self, policy: ScalingPolicy):
         """
         Initialize the scaling controller.
-        
+
         Args:
             policy: Scaling policy configuration
         """
@@ -54,10 +54,10 @@ class ScalingController:
     def get_current_load(self) -> LoadMetrics:
         """
         Retrieve current system load metrics.
-        
+
         In production, this would query Prometheus or other monitoring systems.
         For now, this is a placeholder that returns mock data.
-        
+
         Returns:
             Current load metrics
         """
@@ -72,11 +72,11 @@ class ScalingController:
     def calculate_desired_replicas(self, current_replicas: int, metrics: LoadMetrics) -> int:
         """
         Calculate desired number of replicas based on current metrics.
-        
+
         Args:
             current_replicas: Current number of replicas
             metrics: Current load metrics
-            
+
         Returns:
             Desired number of replicas
         """
@@ -114,12 +114,12 @@ class ScalingController:
                     metrics: LoadMetrics) -> bool:
         """
         Determine if scaling action should be taken.
-        
+
         Args:
             current_replicas: Current number of replicas
             desired_replicas: Desired number of replicas
             metrics: Current load metrics
-            
+
         Returns:
             True if scaling should occur, False otherwise
         """
@@ -154,9 +154,9 @@ class ScalingController:
     def scale_up(self, replicas: int) -> None:
         """
         Increase GPU pod count.
-        
+
         In production, this would interact with Kubernetes API or KEDA.
-        
+
         Args:
             replicas: Target number of replicas
         """
@@ -166,9 +166,9 @@ class ScalingController:
     def scale_down(self, replicas: int) -> None:
         """
         Decrease GPU pod count.
-        
+
         In production, this would interact with Kubernetes API or KEDA.
-        
+
         Args:
             replicas: Target number of replicas
         """
@@ -178,7 +178,7 @@ class ScalingController:
     def configure_scaling_policy(self, policy: ScalingPolicy) -> None:
         """
         Update the scaling policy configuration.
-        
+
         Args:
             policy: New scaling policy
         """
@@ -189,12 +189,12 @@ class ScalingController:
                      local_cost_per_call: float) -> str:
         """
         Determine optimal deployment strategy based on cost.
-        
+
         Args:
             metrics: Current load metrics
             cloud_cost_per_call: Cost per call using cloud LLM APIs
             local_cost_per_call: Cost per call using local GPU inference
-            
+
         Returns:
             Recommended strategy: "cloud", "local", or "hybrid"
         """

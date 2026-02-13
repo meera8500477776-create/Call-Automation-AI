@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class ToolDefinition:
     """
     Defines a tool that can be executed by the ToolExecutor.
-    
+
     Attributes:
         name: Unique identifier for the tool
         description: Human-readable description of what the tool does
@@ -41,7 +41,7 @@ class ToolDefinition:
 class ToolResult:
     """
     Result of a tool execution.
-    
+
     Attributes:
         success: Whether the tool executed successfully
         data: Result data from the tool execution
@@ -59,10 +59,10 @@ class ToolResult:
 class ToolExecutor:
     """
     Executes external API calls based on LLM decisions.
-    
+
     The ToolExecutor manages a registry of available tools, validates parameters
     against JSON schemas, and executes tools with proper error handling.
-    
+
     Requirements: 10.4, 10.5
     """
 
@@ -74,10 +74,10 @@ class ToolExecutor:
     def register_tool(self, tool_def: ToolDefinition) -> None:
         """
         Register a new tool for execution.
-        
+
         Args:
             tool_def: Tool definition containing name, schema, and handler
-            
+
         Raises:
             ValueError: If a tool with the same name is already registered
         """
@@ -94,14 +94,14 @@ class ToolExecutor:
     ) -> tuple[bool, str | None]:
         """
         Validate parameters against the tool's JSON schema.
-        
+
         Args:
             tool_name: Name of the tool to validate parameters for
             parameters: Parameters to validate
-            
+
         Returns:
             Tuple of (is_valid, error_message)
-            
+
         Raises:
             ValueError: If the tool is not registered
         """
@@ -126,12 +126,12 @@ class ToolExecutor:
     ) -> ToolResult:
         """
         Execute a tool with the given parameters.
-        
+
         Args:
             tool_name: Name of the tool to execute
             parameters: Parameters to pass to the tool
             context: Optional context information (e.g., session_id, user_id)
-            
+
         Returns:
             ToolResult containing execution outcome
         """
@@ -188,11 +188,11 @@ class ToolExecutor:
     def handle_tool_error(self, error: Exception, tool_name: str) -> str:
         """
         Handle tool execution errors and return a user-friendly error message.
-        
+
         Args:
             error: The exception that occurred
             tool_name: Name of the tool that failed
-            
+
         Returns:
             User-friendly error message
         """
@@ -208,10 +208,10 @@ class ToolExecutor:
     def get_tool(self, tool_name: str) -> ToolDefinition | None:
         """
         Get a tool definition by name.
-        
+
         Args:
             tool_name: Name of the tool to retrieve
-            
+
         Returns:
             ToolDefinition if found, None otherwise
         """
@@ -220,7 +220,7 @@ class ToolExecutor:
     def list_tools(self) -> list[str]:
         """
         List all registered tool names.
-        
+
         Returns:
             List of registered tool names
         """
@@ -229,10 +229,10 @@ class ToolExecutor:
     def unregister_tool(self, tool_name: str) -> bool:
         """
         Unregister a tool.
-        
+
         Args:
             tool_name: Name of the tool to unregister
-            
+
         Returns:
             True if tool was unregistered, False if tool was not found
         """

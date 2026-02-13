@@ -487,7 +487,7 @@ class TestErrorHandling:
 
 class TestDegradedAudioHandling:
     """Test handling of degraded audio quality.
-    
+
     **Validates: Requirements 12.5**
     """
 

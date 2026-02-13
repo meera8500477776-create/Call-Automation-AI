@@ -174,10 +174,10 @@ class TestEndToEndAudioProcessing:
     async def test_complete_audio_pipeline_flow(self, initialized_pipeline):
         """
         Test complete audio processing flow from input to output.
-        
+
         Validates that audio flows through all pipeline stages:
         Audio Input → VAD → STT → LLM → TTS → Audio Output
-        
+
         **Validates: Requirements 2.1, 2.2, 2.3**
         """
         pipeline = initialized_pipeline
@@ -250,10 +250,10 @@ class TestEndToEndAudioProcessing:
     async def test_multiple_turns_conversation(self, initialized_pipeline):
         """
         Test multiple conversation turns through the pipeline.
-        
+
         Validates that the pipeline can handle multiple user inputs
         and maintain conversation context.
-        
+
         **Validates: Requirements 2.1, 2.2, 2.3**
         """
         pipeline = initialized_pipeline
@@ -324,9 +324,9 @@ class TestEndToEndAudioProcessing:
     async def test_audio_processing_with_latency_tracking(self, initialized_pipeline):
         """
         Test audio processing tracks latency for all stages.
-        
+
         Validates that latency is measured for STT, LLM, TTS, and end-to-end.
-        
+
         **Validates: Requirements 2.1, 2.2, 2.7**
         """
         pipeline = initialized_pipeline
@@ -391,10 +391,10 @@ class TestBargeInFunctionality:
     async def test_barge_in_interrupts_agent_speech(self, initialized_pipeline):
         """
         Test barge-in interrupts ongoing agent speech.
-        
+
         Validates that when user speaks while agent is speaking,
         the agent's speech is interrupted.
-        
+
         **Validates: Requirements 2.5**
         """
         pipeline = initialized_pipeline
@@ -449,7 +449,7 @@ class TestBargeInFunctionality:
     async def test_barge_in_disabled_does_not_interrupt(self, initialized_pipeline):
         """
         Test that with barge-in disabled, agent speech is not interrupted.
-        
+
         **Validates: Requirements 2.5**
         """
         pipeline = initialized_pipeline
@@ -504,9 +504,9 @@ class TestBargeInFunctionality:
     async def test_barge_in_during_audio_generation(self, initialized_pipeline):
         """
         Test barge-in during active audio generation.
-        
+
         Validates that barge-in works during the TTS streaming phase.
-        
+
         **Validates: Requirements 2.5**
         """
         pipeline = initialized_pipeline
@@ -566,10 +566,10 @@ class TestConcurrentProcessing:
     async def test_concurrent_llm_processing(self, initialized_pipeline):
         """
         Test concurrent LLM processing with multiple requests.
-        
+
         Validates that the pipeline can handle multiple LLM requests
         concurrently when configured to do so.
-        
+
         **Validates: Requirements 2.2, 2.3**
         """
         pipeline = initialized_pipeline
@@ -629,10 +629,10 @@ class TestConcurrentProcessing:
     async def test_concurrent_tts_processing(self, initialized_pipeline):
         """
         Test concurrent TTS processing with multiple requests.
-        
+
         Validates that the pipeline can handle multiple TTS requests
         concurrently when configured to do so.
-        
+
         **Validates: Requirements 2.2, 2.3**
         """
         pipeline = initialized_pipeline
@@ -686,10 +686,10 @@ class TestConcurrentProcessing:
     async def test_pipeline_stages_run_concurrently(self, initialized_pipeline):
         """
         Test that pipeline stages can run concurrently.
-        
+
         Validates that STT, LLM, and TTS stages can overlap when
         concurrent processing is enabled.
-        
+
         **Validates: Requirements 2.2, 2.3**
         """
         pipeline = initialized_pipeline
@@ -768,10 +768,10 @@ class TestConcurrentProcessing:
     async def test_backpressure_handling(self, initialized_pipeline):
         """
         Test pipeline handles backpressure correctly.
-        
+
         Validates that when the audio queue fills up, the pipeline
         applies flow control to prevent overflow.
-        
+
         **Validates: Requirements 2.2, 2.3**
         """
         pipeline = initialized_pipeline
@@ -811,10 +811,10 @@ class TestConcurrentProcessing:
     async def test_error_handling_in_concurrent_processing(self, initialized_pipeline):
         """
         Test error handling during concurrent processing.
-        
+
         Validates that errors in one processing stage don't crash
         the entire pipeline.
-        
+
         **Validates: Requirements 2.2, 2.3**
         """
         pipeline = initialized_pipeline

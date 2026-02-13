@@ -35,7 +35,7 @@ class AudioTag(Enum):
 class VoiceConfig:
     """
     Configuration for TTS voice synthesis.
-    
+
     Attributes:
         provider: TTS provider ("elevenlabs" or "openai")
         voice_id: Provider-specific voice identifier
@@ -69,7 +69,7 @@ class VoiceConfig:
 class VoiceSettings:
     """
     Voice settings retrieved from ElevenLabs.
-    
+
     Attributes:
         stability: Voice stability setting
         similarity_boost: Similarity boost setting
@@ -86,7 +86,7 @@ class VoiceSettings:
 class TTSConfig:
     """
     Configuration for TTS service.
-    
+
     Attributes:
         api_key: ElevenLabs API key
         default_voice_config: Default voice configuration
@@ -104,7 +104,7 @@ class TTSConfig:
 class ElevenLabsTTSService:
     """
     ElevenLabs Text-to-Speech service wrapper.
-    
+
     Provides streaming synthesis with emotional context support,
     voice cloning capabilities, and configurable voice settings
     for natural, empathetic speech generation.
@@ -113,7 +113,7 @@ class ElevenLabsTTSService:
     def __init__(self, config: TTSConfig):
         """
         Initialize ElevenLabs TTS service.
-        
+
         Args:
             config: TTS configuration including API key and voice settings
         """
@@ -136,17 +136,17 @@ class ElevenLabsTTSService:
     ) -> AsyncIterator[bytes]:
         """
         Synthesize text to speech with streaming output.
-        
+
         Generates audio chunks as they become available for minimal latency.
         Supports ElevenLabs audio tags for emotional context.
-        
+
         Args:
             text: Text to synthesize
             voice_config: Voice configuration (uses default if None)
-            
+
         Yields:
             Audio data chunks as bytes
-            
+
         Raises:
             RuntimeError: If synthesis fails
             ValueError: If text is empty
@@ -208,14 +208,14 @@ class ElevenLabsTTSService:
     def apply_emotional_context(self, text: str, tags: list[str]) -> str:
         """
         Apply emotional context to text using audio tags.
-        
+
         Inserts ElevenLabs audio tags into text to modulate tone and
         emotional delivery. Supports tags like [sigh], [laughs], <excited>.
-        
+
         Args:
             text: Original text
             tags: List of emotional tags to apply
-            
+
         Returns:
             Text with audio tags inserted
         """
@@ -280,18 +280,18 @@ class ElevenLabsTTSService:
     ) -> str:
         """
         Clone a voice from audio samples.
-        
+
         Creates a custom voice in ElevenLabs from provided audio samples.
         Requires at least 1 minute of clear audio for best results.
-        
+
         Args:
             audio_samples: List of audio file data (bytes)
             voice_name: Name for the cloned voice
             description: Optional description of the voice
-            
+
         Returns:
             Voice ID of the cloned voice
-            
+
         Raises:
             RuntimeError: If voice cloning fails
             ValueError: If audio samples are invalid
@@ -330,16 +330,16 @@ class ElevenLabsTTSService:
     async def get_voice_settings(self, voice_id: str) -> VoiceSettings:
         """
         Retrieve voice settings for a specific voice.
-        
+
         Gets the current configuration for a voice, including stability,
         similarity boost, and style settings. Results are cached.
-        
+
         Args:
             voice_id: ElevenLabs voice identifier
-            
+
         Returns:
             Voice settings configuration
-            
+
         Raises:
             RuntimeError: If retrieval fails
         """
@@ -381,10 +381,10 @@ class ElevenLabsTTSService:
     async def list_available_voices(self) -> list[dict[str, Any]]:
         """
         List all available voices from ElevenLabs.
-        
+
         Returns:
             List of voice information dictionaries
-            
+
         Raises:
             RuntimeError: If listing fails
         """

@@ -27,7 +27,7 @@ class DateRange:
 class Slot:
     """
     Represents a FHIR Slot resource for available appointment times.
-    
+
     Requirements: 3.2
     """
     id: str
@@ -43,7 +43,7 @@ class Slot:
 class Appointment:
     """
     Represents a FHIR Appointment resource.
-    
+
     Requirements: 3.3, 3.5
     """
     id: str
@@ -63,7 +63,7 @@ class Appointment:
 class AppointmentConstraints:
     """
     Represents constraints for appointment operations.
-    
+
     Requirements: 3.5
     """
     is_cancelable: bool
@@ -74,7 +74,7 @@ class AppointmentConstraints:
 class CancellationResult:
     """
     Represents the result of an appointment cancellation.
-    
+
     Requirements: 3.5
     """
     success: bool
@@ -86,10 +86,10 @@ class CancellationResult:
 class FHIRAdapter:
     """
     FHIR adapter for EHR system integration via SMART-on-FHIR.
-    
+
     Supports Epic and Cerner EHR systems through standard FHIR operations
     including $find and $book for appointment management.
-    
+
     Requirements:
     - 3.1: OAuth 2.0 authentication with scoped access tokens
     - 3.2: Appointment slot search using $find operation
@@ -110,7 +110,7 @@ class FHIRAdapter:
     ):
         """
         Initialize the FHIR adapter.
-        
+
         Args:
             base_url: Base URL of the FHIR server (e.g., "https://fhir.epic.com/api/FHIR/R4")
             auth_service: Authentication service for OAuth 2.0
@@ -128,15 +128,15 @@ class FHIRAdapter:
     async def authenticate(self, scopes: list[str]) -> AccessToken:
         """
         Authenticate with the EHR system using OAuth 2.0.
-        
+
         Requirements: 3.1
-        
+
         Args:
             scopes: List of OAuth scopes to request (e.g., ["patient/Appointment.read"])
-            
+
         Returns:
             AccessToken with authentication credentials
-            
+
         Raises:
             ValueError: If authentication fails
         """
@@ -166,17 +166,17 @@ class FHIRAdapter:
     ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the FHIR server.
-        
+
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
             endpoint: API endpoint path
             scopes: Required OAuth scopes
             data: Optional request body data
             params: Optional query parameters
-            
+
         Returns:
             Response data as dictionary
-            
+
         Raises:
             ValueError: If request fails
         """
@@ -216,12 +216,12 @@ class FHIRAdapter:
     def _parse_slot(self, slot_resource: dict[str, Any]) -> Slot:
         """
         Parse a FHIR Slot resource into a Slot object.
-        
+
         Requirements: 3.2
-        
+
         Args:
             slot_resource: FHIR Slot resource as dictionary
-            
+
         Returns:
             Parsed Slot object
         """
@@ -238,12 +238,12 @@ class FHIRAdapter:
     def _parse_appointment(self, appointment_resource: dict[str, Any]) -> Appointment:
         """
         Parse a FHIR Appointment resource into an Appointment object.
-        
+
         Requirements: 3.3, 3.5
-        
+
         Args:
             appointment_resource: FHIR Appointment resource as dictionary
-            
+
         Returns:
             Parsed Appointment object
         """
@@ -294,17 +294,17 @@ class FHIRAdapter:
     ) -> list[Slot]:
         """
         Search for available appointment slots using FHIR $find operation.
-        
+
         Requirements: 3.2, 3.6
-        
+
         Args:
             patient_id: Patient identifier
             date_range: Date range for appointment search
             specialty: Optional specialty filter (e.g., "Cardiology")
-            
+
         Returns:
             List of available Slot objects, optimized by calendar heuristics
-            
+
         Raises:
             ValueError: If search operation fails
         """
@@ -347,18 +347,18 @@ class FHIRAdapter:
     def _optimize_slots(self, slots: list[Slot], date_range: DateRange) -> list[Slot]:
         """
         Apply calendar optimization heuristics to slot list.
-        
+
         Requirements: 3.6
-        
+
         Heuristics:
         - Sort by start time (earliest first)
         - Prefer slots closer to the start of the requested range
         - Group by practitioner for consistency
-        
+
         Args:
             slots: List of available slots
             date_range: Original search date range
-            
+
         Returns:
             Optimized list of slots
         """
@@ -376,18 +376,18 @@ class FHIRAdapter:
     ) -> Appointment:
         """
         Book an appointment using FHIR $book operation.
-        
+
         Requirements: 3.3
-        
+
         Args:
             patient_id: Patient identifier
             slot_id: Slot identifier to book
             reason: Reason for appointment
             practitioner_id: Optional practitioner identifier
-            
+
         Returns:
             Created Appointment object
-            
+
         Raises:
             ValueError: If booking operation fails or validation fails
         """
@@ -438,16 +438,16 @@ class FHIRAdapter:
     ) -> Appointment:
         """
         Reschedule an existing appointment to a new slot.
-        
+
         Requirements: 3.5, 3.7
-        
+
         Args:
             appointment_id: Existing appointment identifier
             new_slot_id: New slot identifier
-            
+
         Returns:
             Updated Appointment object
-            
+
         Raises:
             ValueError: If rescheduling fails or appointment is not reschedulable
         """
@@ -491,16 +491,16 @@ class FHIRAdapter:
     ) -> CancellationResult:
         """
         Cancel an existing appointment.
-        
+
         Requirements: 3.5, 3.7
-        
+
         Args:
             appointment_id: Appointment identifier to cancel
             reason: Reason for cancellation
-            
+
         Returns:
             CancellationResult with operation status
-            
+
         Raises:
             ValueError: If cancellation fails or appointment is not cancelable
         """
@@ -559,15 +559,15 @@ class FHIRAdapter:
     async def check_constraints(self, appointment_id: str) -> AppointmentConstraints:
         """
         Check appointment constraints (is-cancelable, is-reschedulable flags).
-        
+
         Requirements: 3.5, 3.7
-        
+
         Args:
             appointment_id: Appointment identifier
-            
+
         Returns:
             AppointmentConstraints with constraint flags
-            
+
         Raises:
             ValueError: If constraint check fails
         """

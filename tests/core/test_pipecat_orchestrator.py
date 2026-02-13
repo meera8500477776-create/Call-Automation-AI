@@ -282,7 +282,7 @@ class TestPipecatOrchestrator:
     @pytest.mark.asyncio
     async def test_stop_session_no_pipeline(self, orchestrator):
         """Test stopping session with no active pipeline."""
-        summary = await orchestrator.stop_session("nonexistent_session")
+        await orchestrator.stop_session("nonexistent_session")
 
         # Should still cleanup session
         orchestrator._session_manager.cleanup_session.assert_called_once_with(
@@ -297,7 +297,7 @@ class TestPipecatOrchestrator:
         orchestrator._active_pipelines["test_session"] = mock_pipeline
 
         # Should not raise, but log error
-        summary = await orchestrator.stop_session("test_session")
+        await orchestrator.stop_session("test_session")
 
         # Verify pipeline was still removed
         assert "test_session" not in orchestrator._active_pipelines

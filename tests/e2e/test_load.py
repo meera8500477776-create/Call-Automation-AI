@@ -56,7 +56,7 @@ class TestConcurrentCallHandling:
     async def test_handle_100_concurrent_calls(self):
         """
         Test handling 100 concurrent calls.
-        
+
         **Validates: Requirements 9.6**
         """
         with patch('src.voice_agent.core.pipecat_orchestrator.TenantRegistry') as mock_registry_class:
@@ -85,7 +85,7 @@ class TestConcurrentCallHandling:
                 p.shutdown = AsyncMock()
                 return p
 
-            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline) as mock_init:
+            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline):
 
                 # Create 100 concurrent calls
                 num_calls = 100
@@ -139,7 +139,7 @@ class TestConcurrentCallHandling:
     async def test_handle_1000_concurrent_calls(self):
         """
         Test handling 1000+ concurrent calls.
-        
+
         **Validates: Requirements 9.6**
         """
         with patch('src.voice_agent.core.pipecat_orchestrator.TenantRegistry') as mock_registry_class:
@@ -168,7 +168,7 @@ class TestConcurrentCallHandling:
                 p.shutdown = AsyncMock()
                 return p
 
-            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline) as mock_init:
+            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline):
 
                 num_calls = 1000
 
@@ -330,7 +330,7 @@ class TestLatencyUnderLoad:
     async def test_latency_remains_under_1000ms_at_100_concurrent(self, latency_monitor):
         """
         Test that latency remains under 1000ms with 100 concurrent calls.
-        
+
         **Validates: Requirements 2.1, 2.8**
         """
         num_sessions = 100
@@ -388,7 +388,7 @@ class TestLatencyUnderLoad:
     async def test_latency_degradation_at_high_load(self, latency_monitor):
         """
         Test latency degradation at high load (1000 concurrent calls).
-        
+
         **Validates: Requirements 2.1, 9.6**
         """
         num_sessions = 1000
@@ -455,7 +455,7 @@ class TestSystemStability:
     async def test_system_stability_sustained_1000_calls(self):
         """
         Test system stability with sustained 1000 concurrent calls.
-        
+
         **Validates: Requirements 9.5, 9.6**
         """
         with patch('src.voice_agent.core.pipecat_orchestrator.TenantRegistry') as mock_registry_class:
@@ -484,7 +484,7 @@ class TestSystemStability:
                 p.shutdown = AsyncMock()
                 return p
 
-            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline) as mock_init:
+            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline):
 
                 num_calls = 1000
 
@@ -539,7 +539,7 @@ class TestSystemStability:
     async def test_no_memory_leaks_during_session_churn(self):
         """
         Test for memory leaks during high session churn.
-        
+
         **Validates: Requirements 9.5, 11.6**
         """
         with patch('src.voice_agent.core.pipecat_orchestrator.TenantRegistry') as mock_registry_class:
@@ -568,7 +568,7 @@ class TestSystemStability:
                 p.shutdown = AsyncMock()
                 return p
 
-            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline) as mock_init:
+            with patch.object(orchestrator, 'initialize_pipeline', side_effect=mock_init_pipeline):
                 # Simulate high churn: start and stop sessions repeatedly
                 num_iterations = 100
                 sessions_per_iteration = 10

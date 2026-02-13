@@ -395,7 +395,7 @@ class TestSessionManager:
             caller_id="+15551234567"
         )
 
-        turn1 = manager.add_turn(session.session_id, "user", "Hello")
+        manager.add_turn(session.session_id, "user", "Hello")
         turn2 = manager.add_turn(session.session_id, "agent", "Hi")
         turn3 = manager.add_turn(session.session_id, "user", "I need help")
 

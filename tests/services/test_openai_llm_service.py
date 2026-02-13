@@ -96,7 +96,7 @@ class TestOpenAILLMServiceInitialization:
 class TestVoiceOptimizedSystemPrompt:
     """
     Test voice-optimized system prompt generation.
-    
+
     **Validates: Requirements 6.1, 6.2, 6.3**
     """
 
@@ -542,7 +542,7 @@ class TestEmotionalTagExtraction:
 class TestGenerateResponse:
     """
     Test complete response generation flow.
-    
+
     **Validates: Requirements 13.1, 6.1, 6.2, 6.3**
     """
 
@@ -691,7 +691,7 @@ class TestGenerateResponse:
 class TestVoiceOptimizationIntegration:
     """
     Test voice optimization is properly integrated.
-    
+
     **Validates: Requirements 6.1, 6.2, 6.3**
     """
 

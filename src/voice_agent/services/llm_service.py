@@ -31,7 +31,7 @@ class IntentType(Enum):
 class Intent:
     """
     Represents a classified user intent.
-    
+
     Attributes:
         name: Intent identifier (e.g., "schedule_appointment")
         confidence: Confidence score (0.0-1.0)
@@ -57,7 +57,7 @@ class Intent:
 class ToolCall:
     """
     Represents a tool execution request.
-    
+
     Attributes:
         tool_name: Name of the tool to execute
         parameters: Parameters to pass to the tool
@@ -72,7 +72,7 @@ class ToolCall:
 class LLMResponse:
     """
     Complete response from LLM service.
-    
+
     Attributes:
         text: Generated response text (voice-optimized)
         intent: Classified user intent
@@ -100,7 +100,7 @@ class LLMResponse:
 class LLMConfig:
     """
     Configuration for LLM service.
-    
+
     Attributes:
         provider: LLM provider ("openai", "ollama", "vllm")
         model: Model identifier
@@ -136,7 +136,7 @@ class LLMConfig:
 class ConversationContext:
     """
     Conversation context for LLM processing.
-    
+
     Attributes:
         session_id: Unique session identifier
         conversation_history: List of previous turns
@@ -156,7 +156,7 @@ class ConversationContext:
 class LLMService(ABC):
     """
     Abstract base class for LLM service implementations.
-    
+
     Provides interface for intent classification, parameter extraction,
     response generation, and voice optimization. Concrete implementations
     should subclass this for specific providers (OpenAI, Ollama, vLLM).
@@ -165,7 +165,7 @@ class LLMService(ABC):
     def __init__(self, config: LLMConfig):
         """
         Initialize LLM service.
-        
+
         Args:
             config: LLM configuration
         """
@@ -184,14 +184,14 @@ class LLMService(ABC):
     ) -> LLMResponse:
         """
         Generate response from user transcript.
-        
+
         Args:
             transcript: User's transcribed speech
             context: Conversation context
-            
+
         Returns:
             Complete LLM response with intent, parameters, and text
-            
+
         Raises:
             RuntimeError: If LLM request fails
         """
@@ -200,13 +200,13 @@ class LLMService(ABC):
     def classify_intent(self, transcript: str) -> Intent:
         """
         Classify user intent from transcript.
-        
+
         This is a basic implementation that can be overridden by subclasses
         for more sophisticated intent classification.
-        
+
         Args:
             transcript: User's transcribed speech
-            
+
         Returns:
             Classified intent with confidence score
         """
@@ -258,14 +258,14 @@ class LLMService(ABC):
     def extract_parameters(self, transcript: str, intent: Intent) -> dict[str, Any]:
         """
         Extract structured parameters from transcript.
-        
+
         This is a basic implementation using regex patterns. Subclasses
         should override for more sophisticated extraction using LLM.
-        
+
         Args:
             transcript: User's transcribed speech
             intent: Classified intent
-            
+
         Returns:
             Dictionary of extracted parameters
         """
@@ -307,11 +307,11 @@ class LLMService(ABC):
     def should_use_tool(self, intent: Intent, parameters: dict[str, Any]) -> ToolCall | None:
         """
         Determine if tool execution is needed.
-        
+
         Args:
             intent: Classified intent
             parameters: Extracted parameters
-            
+
         Returns:
             ToolCall if tool should be executed, None otherwise
         """
@@ -319,7 +319,7 @@ class LLMService(ABC):
             return None
 
         # Check if we have sufficient parameters for tool execution
-        required_params = self._get_required_parameters(intent.tool_name)
+        self._get_required_parameters(intent.tool_name)
 
         # For now, create tool call even with partial parameters
         # The tool executor will handle validation
@@ -334,13 +334,13 @@ class LLMService(ABC):
     def format_for_voice(self, response: str) -> str:
         """
         Optimize response text for voice output.
-        
+
         Removes markdown, limits sentence count, and ensures
         conversational language suitable for TTS.
-        
+
         Args:
             response: Raw response text
-            
+
         Returns:
             Voice-optimized response text
         """
@@ -395,10 +395,10 @@ class LLMService(ABC):
     def _get_required_parameters(self, tool_name: str | None) -> list[str]:
         """
         Get required parameters for a tool.
-        
+
         Args:
             tool_name: Name of the tool
-            
+
         Returns:
             List of required parameter names
         """

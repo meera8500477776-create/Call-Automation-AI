@@ -59,11 +59,15 @@ line-length = 100
 target-version = ["py310"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]  # Ignore line-too-long for now
+
+[tool.ruff.lint.per-file-ignores]
+"src/voice_agent/services/vllm_llm_service.py" = ["N801"]  # Allow vLLMLLMService class name
 
 [tool.mypy]
 python_version = "3.10"

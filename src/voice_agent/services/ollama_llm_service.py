@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class OllamaLLMService(LLMService):
     """
     Ollama-based LLM service implementation.
-    
+
     Provides local LLM deployment with streaming support, GPU acceleration,
     and fallback handling for data sovereignty and offline scenarios.
     """
@@ -40,7 +40,7 @@ class OllamaLLMService(LLMService):
     ):
         """
         Initialize Ollama LLM service.
-        
+
         Args:
             config: LLM configuration
             base_url: Ollama API base URL
@@ -68,7 +68,7 @@ class OllamaLLMService(LLMService):
     async def _get_session(self) -> aiohttp.ClientSession:
         """
         Get or create aiohttp session.
-        
+
         Returns:
             Active aiohttp session
         """
@@ -86,7 +86,7 @@ class OllamaLLMService(LLMService):
     async def check_model_availability(self) -> bool:
         """
         Check if the configured model is available in Ollama.
-        
+
         Returns:
             True if model is available, False otherwise
         """
@@ -132,17 +132,17 @@ class OllamaLLMService(LLMService):
     ) -> LLMResponse:
         """
         Generate response from user transcript using Ollama.
-        
+
         Attempts to use local Ollama model with fallback to alternative
         service if model is unavailable.
-        
+
         Args:
             transcript: User's transcribed speech
             context: Conversation context
-            
+
         Returns:
             Complete LLM response with intent, parameters, and text
-            
+
         Raises:
             RuntimeError: If both Ollama and fallback service fail
         """
@@ -190,13 +190,13 @@ class OllamaLLMService(LLMService):
     async def _call_ollama(self, prompt: str) -> str:
         """
         Call Ollama API to generate response.
-        
+
         Args:
             prompt: Complete prompt including system instructions
-            
+
         Returns:
             Generated response text
-            
+
         Raises:
             RuntimeError: If API call fails
         """
@@ -241,11 +241,11 @@ class OllamaLLMService(LLMService):
     ) -> str:
         """
         Build prompt for Ollama with voice-optimized instructions.
-        
+
         Args:
             transcript: Current user transcript
             context: Conversation context
-            
+
         Returns:
             Complete prompt string
         """
@@ -275,13 +275,13 @@ Assistant:"""
     def _build_voice_optimized_system_prompt(self) -> str:
         """
         Build voice-optimized system prompt.
-        
+
         Incorporates requirements for voice-only responses:
         - No markdown, tables, or bullet points
         - Maximum 3 sentences per response
         - Empathetic, conversational language
         - Explicit knowledge boundaries
-        
+
         Returns:
             Voice-optimized system prompt
         """
@@ -312,14 +312,14 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     ) -> LLMResponse:
         """
         Parse Ollama response into LLMResponse format.
-        
+
         Extracts intent and parameters from the response text and
         original transcript using the base class methods.
-        
+
         Args:
             response_text: Generated response from Ollama
             original_transcript: Original user transcript
-            
+
         Returns:
             Parsed LLM response
         """
@@ -360,13 +360,13 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     def _extract_emotional_tags(self, text: str) -> list[str]:
         """
         Extract emotional tags for TTS from response text.
-        
+
         Looks for emotional indicators in the text that can be
         used by TTS services for more natural speech synthesis.
-        
+
         Args:
             text: Response text
-            
+
         Returns:
             List of emotional tags
         """

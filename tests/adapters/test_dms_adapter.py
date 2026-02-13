@@ -26,7 +26,7 @@ from voice_agent.adapters.dms_adapter import (
 def create_mock_aiohttp_session(responses):
     """
     Helper to create a properly mocked aiohttp session.
-    
+
     Args:
         responses: List of (status, json_data, text_data) tuples or a single tuple
     """

@@ -71,10 +71,10 @@ class WorkflowParameters:
 class AppointmentSchedulingWorkflow:
     """
     Multi-turn conversation workflow for appointment scheduling.
-    
+
     Handles parameter extraction, slot search, confirmation, and booking
     through natural conversation flow with error handling and recovery.
-    
+
     Requirements:
     - 10.7: Multi-turn workflow requiring multiple pieces of information
     - 10.8: Appointment scheduling workflow
@@ -85,7 +85,7 @@ class AppointmentSchedulingWorkflow:
     def __init__(self, fhir_adapter: FHIRAdapter):
         """
         Initialize the appointment scheduling workflow.
-        
+
         Args:
             fhir_adapter: FHIR adapter for EHR integration
         """
@@ -100,12 +100,12 @@ class AppointmentSchedulingWorkflow:
     ) -> str:
         """
         Process a conversation turn in the scheduling workflow.
-        
+
         Args:
             session: Current conversation session
             user_transcript: User's transcribed speech
             extracted_params: Parameters extracted from user input
-            
+
         Returns:
             Agent response text for this turn
         """
@@ -183,7 +183,7 @@ class AppointmentSchedulingWorkflow:
     ) -> str:
         """Handle initial stage - start collecting parameters."""
         # Check what we already have
-        missing = workflow_params.get_missing_parameters()
+        workflow_params.get_missing_parameters()
 
         if not workflow_params.date:
             session.workflow_stage = WorkflowStage.COLLECTING_DATE.value
@@ -349,10 +349,10 @@ class AppointmentSchedulingWorkflow:
     def _parse_date_to_range(self, date_str: str) -> DateRange:
         """
         Parse a date string to a DateRange.
-        
+
         Args:
             date_str: Date string (e.g., "tomorrow", "Monday", "January 15")
-            
+
         Returns:
             DateRange for searching appointments
         """
@@ -387,11 +387,11 @@ class AppointmentSchedulingWorkflow:
     def _find_best_slot(self, slots: list[Slot], preferred_time: str | None) -> Slot:
         """
         Find the best matching slot based on preferred time.
-        
+
         Args:
             slots: List of available slots
             preferred_time: Preferred time string (e.g., "2pm", "morning")
-            
+
         Returns:
             Best matching slot
         """

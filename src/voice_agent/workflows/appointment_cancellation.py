@@ -49,10 +49,10 @@ class CancelWorkflowParameters:
 class AppointmentCancellationWorkflow:
     """
     Multi-turn conversation workflow for appointment cancellation.
-    
+
     Handles existing appointment lookup, constraint checking, reason collection,
     confirmation, and cancellation through natural conversation flow.
-    
+
     Requirements:
     - 10.7: Multi-turn workflow requiring multiple pieces of information
     - 3.5: FHIR adapter integration for cancellation with constraint checking
@@ -61,7 +61,7 @@ class AppointmentCancellationWorkflow:
     def __init__(self, fhir_adapter: FHIRAdapter):
         """
         Initialize the appointment cancellation workflow.
-        
+
         Args:
             fhir_adapter: FHIR adapter for EHR integration
         """
@@ -76,12 +76,12 @@ class AppointmentCancellationWorkflow:
     ) -> str:
         """
         Process a conversation turn in the cancellation workflow.
-        
+
         Args:
             session: Current conversation session
             user_transcript: User's transcribed speech
             extracted_params: Parameters extracted from user input
-            
+
         Returns:
             Agent response text for this turn
         """
@@ -172,7 +172,7 @@ class AppointmentCancellationWorkflow:
             # Search for upcoming appointments for this patient
             # Look for appointments in the next 90 days
             today = date.today()
-            date_range = DateRange(start=today, end=today + timedelta(days=90))
+            DateRange(start=today, end=today + timedelta(days=90))
 
             if workflow_params.existing_appointment_id:
                 # We have a specific appointment ID, check its constraints
@@ -305,7 +305,7 @@ class AppointmentCancellationWorkflow:
 
         try:
             # Cancel the appointment
-            result = await self.fhir_adapter.cancel_appointment(
+            await self.fhir_adapter.cancel_appointment(
                 appointment_id=workflow_params.existing_appointment_id,
                 reason=workflow_params.cancellation_reason or "Patient requested cancellation"
             )

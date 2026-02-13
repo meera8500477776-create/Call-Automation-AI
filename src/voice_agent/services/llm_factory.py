@@ -32,7 +32,7 @@ class ProviderHealth(Enum):
 class LLMProviderFactory:
     """
     Factory for creating LLM service instances with health checking and failover.
-    
+
     Provides a consistent interface for creating LLM providers based on
     tenant configuration, with automatic health checking and failover to
     alternative providers when primary provider is unavailable.
@@ -47,7 +47,7 @@ class LLMProviderFactory:
     ):
         """
         Initialize LLM provider factory.
-        
+
         Args:
             openai_api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
             ollama_base_url: Ollama server base URL
@@ -74,19 +74,19 @@ class LLMProviderFactory:
     ) -> LLMService:
         """
         Create LLM service instance based on configuration.
-        
+
         Selects the appropriate provider implementation based on the
         config.provider field and creates an instance with proper
         configuration. If failover is enabled and the primary provider
         is unavailable, automatically creates a fallback service.
-        
+
         Args:
             config: LLM configuration specifying provider and model
             provider_config: Optional provider-specific configuration
-            
+
         Returns:
             Configured LLM service instance
-            
+
         Raises:
             ValueError: If provider is not supported
             RuntimeError: If provider creation fails and no fallback available
@@ -139,14 +139,14 @@ class LLMProviderFactory:
     ) -> LLMService:
         """
         Create provider instance without failover logic.
-        
+
         Args:
             config: LLM configuration
             provider_config: Provider-specific configuration
-            
+
         Returns:
             LLM service instance
-            
+
         Raises:
             ValueError: If provider is not supported
         """
@@ -186,15 +186,15 @@ class LLMProviderFactory:
     ) -> LLMService | None:
         """
         Create fallback service for the primary provider.
-        
+
         Fallback strategy:
         - Ollama/vLLM -> OpenAI (cloud fallback for local providers)
         - OpenAI -> None (cloud provider has no fallback)
-        
+
         Args:
             primary_config: Primary provider configuration
             provider_config: Provider-specific configuration
-            
+
         Returns:
             Fallback service instance or None if no fallback available
         """
@@ -241,14 +241,14 @@ class LLMProviderFactory:
     ) -> LLMService:
         """
         Create service with automatic failover to alternative provider.
-        
+
         Args:
             config: Original LLM configuration
             provider_config: Provider-specific configuration
-            
+
         Returns:
             LLM service instance (primary or fallback)
-            
+
         Raises:
             RuntimeError: If all providers fail
         """
@@ -288,14 +288,14 @@ class LLMProviderFactory:
     async def check_provider_health(self, provider: str) -> ProviderHealth:
         """
         Check health status of a provider.
-        
+
         Performs lightweight health check to determine if provider is
         available and responsive. Results are cached to avoid excessive
         health checks.
-        
+
         Args:
             provider: Provider name ("openai", "ollama", "vllm")
-            
+
         Returns:
             Provider health status
         """
@@ -338,7 +338,7 @@ class LLMProviderFactory:
     async def _check_ollama_health(self) -> ProviderHealth:
         """
         Check Ollama server health.
-        
+
         Returns:
             Provider health status
         """
@@ -358,7 +358,7 @@ class LLMProviderFactory:
     async def _check_vllm_health(self) -> ProviderHealth:
         """
         Check vLLM server health.
-        
+
         Returns:
             Provider health status
         """
@@ -383,7 +383,7 @@ class LLMProviderFactory:
     async def get_all_provider_health(self) -> dict[str, ProviderHealth]:
         """
         Get health status for all supported providers.
-        
+
         Returns:
             Dictionary mapping provider names to health status
         """

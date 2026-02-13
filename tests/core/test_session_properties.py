@@ -79,9 +79,9 @@ def conversation_turn_strategy(draw):
 @pytest.mark.property
 class TestSessionContextPreservation:
     """Property 2: Session context preservation.
-    
+
     **Validates: Requirements 10.1**
-    
+
     For any sequence of conversation turns, retrieving context should return
     all turns in order.
     """
@@ -90,7 +90,7 @@ class TestSessionContextPreservation:
     @given(st.lists(conversation_turn_strategy(), min_size=1, max_size=20))
     def test_context_preserves_all_turns_in_order(self, turns):
         """Test that get_context returns all turns in the order they were added.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session
@@ -126,7 +126,7 @@ class TestSessionContextPreservation:
     @given(st.lists(conversation_turn_strategy(), min_size=1, max_size=20))
     def test_context_turn_count_matches_added_turns(self, turns):
         """Test that turn_count in context matches the number of added turns.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session
@@ -150,7 +150,7 @@ class TestSessionContextPreservation:
     @given(st.lists(conversation_turn_strategy(), min_size=1, max_size=20))
     def test_context_preserves_turn_identity(self, turns):
         """Test that each turn maintains its unique identity through context operations.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session
@@ -183,7 +183,7 @@ class TestSessionContextPreservation:
     )
     def test_context_preserves_order_across_multiple_updates(self, turns_batch1, turns_batch2):
         """Test that context preserves order when turns are added in multiple batches.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session
@@ -216,7 +216,7 @@ class TestSessionContextPreservation:
     @given(st.lists(conversation_turn_strategy(), min_size=1, max_size=20))
     def test_context_preserves_parameters_across_turns(self, turns):
         """Test that extracted parameters are accumulated correctly across turns.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session
@@ -244,7 +244,7 @@ class TestSessionContextPreservation:
     @given(st.lists(conversation_turn_strategy(), min_size=1, max_size=20))
     def test_context_preserves_latest_intent(self, turns):
         """Test that context preserves the most recent intent from turns.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session
@@ -275,7 +275,7 @@ class TestSessionContextPreservation:
     @given(st.lists(conversation_turn_strategy(), min_size=0, max_size=20))
     def test_context_handles_empty_conversation(self, turns):
         """Test that context correctly handles sessions with no or few turns.
-        
+
         **Validates: Requirements 10.1**
         """
         # Create a session

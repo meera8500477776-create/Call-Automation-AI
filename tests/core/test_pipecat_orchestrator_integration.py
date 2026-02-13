@@ -155,10 +155,10 @@ class TestPipelineInitializationWithVariousConfigs:
     ):
         """
         Test pipeline initialization with healthcare tenant configuration.
-        
+
         Validates that pipeline is correctly initialized with healthcare-specific
         settings including persona, LLM provider, and voice configuration.
-        
+
         **Validates: Requirements 1.3, 1.4**
         """
         # Load healthcare tenant config
@@ -204,10 +204,10 @@ class TestPipelineInitializationWithVariousConfigs:
     ):
         """
         Test pipeline initialization with automotive tenant configuration.
-        
+
         Validates that pipeline is correctly initialized with automotive-specific
         settings including different LLM provider (Ollama) and TTS provider (OpenAI).
-        
+
         **Validates: Requirements 1.3, 1.4, 4.2**
         """
         # Load automotive tenant config
@@ -245,10 +245,10 @@ class TestPipelineInitializationWithVariousConfigs:
     ):
         """
         Test initializing multiple pipelines concurrently for different tenants.
-        
+
         Validates that the orchestrator can handle concurrent pipeline
         initialization for multiple tenants without conflicts.
-        
+
         **Validates: Requirements 1.4**
         """
         healthcare_config = tenant_registry.load_tenant_config("healthcare_clinic_001")
@@ -295,10 +295,10 @@ class TestCallRouting:
     def test_route_call_to_healthcare_tenant(self, orchestrator):
         """
         Test routing call to healthcare tenant based on caller ID.
-        
+
         Validates that calls from healthcare-mapped numbers are routed
         to the correct healthcare tenant configuration.
-        
+
         **Validates: Requirements 1.3**
         """
         call_metadata = CallMetadata(
@@ -321,10 +321,10 @@ class TestCallRouting:
     def test_route_call_to_automotive_tenant(self, orchestrator):
         """
         Test routing call to automotive tenant based on caller ID.
-        
+
         Validates that calls from automotive-mapped numbers are routed
         to the correct automotive tenant configuration.
-        
+
         **Validates: Requirements 1.3, 4.2**
         """
         call_metadata = CallMetadata(
@@ -347,9 +347,9 @@ class TestCallRouting:
     def test_route_multiple_callers_to_same_tenant(self, orchestrator):
         """
         Test routing multiple caller IDs to the same tenant.
-        
+
         Validates that multiple caller IDs can map to the same tenant.
-        
+
         **Validates: Requirements 1.3**
         """
         caller1 = "+15551234567"
@@ -375,9 +375,9 @@ class TestCallRouting:
     def test_route_call_with_unknown_caller(self, orchestrator):
         """
         Test routing call with unknown caller ID raises error.
-        
+
         Validates that calls from unmapped numbers are rejected.
-        
+
         **Validates: Requirements 1.3**
         """
         call_metadata = CallMetadata(
@@ -400,10 +400,10 @@ class TestSessionLifecycleManagement:
     async def test_complete_session_lifecycle(self, orchestrator):
         """
         Test complete session lifecycle from start to stop.
-        
+
         Validates that a session can be started, used, and stopped cleanly
         with proper resource management.
-        
+
         **Validates: Requirements 11.5, 11.6**
         """
         call_metadata = CallMetadata(
@@ -453,10 +453,10 @@ class TestSessionLifecycleManagement:
     async def test_multiple_concurrent_sessions(self, orchestrator):
         """
         Test managing multiple concurrent sessions.
-        
+
         Validates that the orchestrator can handle multiple active sessions
         simultaneously without interference.
-        
+
         **Validates: Requirements 1.4, 11.5**
         """
         # Mock pipeline initialization
@@ -480,9 +480,9 @@ class TestSessionLifecycleManagement:
             call2 = CallMetadata(caller_id="+15559876543", call_sid="CA_002", from_number="+15559876543")
             call3 = CallMetadata(caller_id="+15555555555", call_sid="CA_003", from_number="+15555555555")
 
-            pipeline1 = await orchestrator.start_session("session_1", "+15551234567", call1)
-            pipeline2 = await orchestrator.start_session("session_2", "+15559876543", call2)
-            pipeline3 = await orchestrator.start_session("session_3", "+15555555555", call3)
+            await orchestrator.start_session("session_1", "+15551234567", call1)
+            await orchestrator.start_session("session_2", "+15559876543", call2)
+            await orchestrator.start_session("session_3", "+15555555555", call3)
 
             # Verify all sessions are active
             assert orchestrator.get_session_count() == 3
@@ -511,9 +511,9 @@ class TestSessionLifecycleManagement:
     async def test_session_cleanup_on_start_failure(self, orchestrator):
         """
         Test session cleanup when start fails.
-        
+
         Validates that if session start fails, resources are properly cleaned up.
-        
+
         **Validates: Requirements 11.5, 11.6**
         """
         call_metadata = CallMetadata(
@@ -544,10 +544,10 @@ class TestSessionLifecycleManagement:
     async def test_stop_session_with_pipeline_error(self, orchestrator):
         """
         Test stopping session when pipeline shutdown fails.
-        
+
         Validates that session is still cleaned up even if pipeline
         shutdown encounters an error.
-        
+
         **Validates: Requirements 11.5, 11.6**
         """
         call_metadata = CallMetadata(
@@ -588,10 +588,10 @@ class TestComponentIntegration:
     async def test_tenant_registry_to_pipeline_integration(self, orchestrator, tenant_registry):
         """
         Test data flow from tenant registry to pipeline initialization.
-        
+
         Validates that tenant configuration is correctly passed through
         the orchestrator to create a properly configured pipeline.
-        
+
         **Validates: Requirements 1.3, 1.4**
         """
         # Load tenant config
@@ -624,10 +624,10 @@ class TestComponentIntegration:
     async def test_session_manager_integration(self, orchestrator):
         """
         Test integration between orchestrator and session manager.
-        
+
         Validates that session manager correctly creates and manages
         sessions initiated by the orchestrator.
-        
+
         **Validates: Requirements 11.5**
         """
         call_metadata = CallMetadata(
@@ -674,10 +674,10 @@ class TestComponentIntegration:
     async def test_end_to_end_call_flow(self, orchestrator):
         """
         Test complete end-to-end call flow through all components.
-        
+
         Validates the complete data flow:
         Call → Route → Create Session → Initialize Pipeline → Active → Stop → Cleanup
-        
+
         **Validates: Requirements 1.3, 1.4, 11.5, 11.6**
         """
         call_metadata = CallMetadata(
@@ -702,7 +702,7 @@ class TestComponentIntegration:
             assert tenant_config.tenant_id == "healthcare_clinic_001"
 
             # Step 2: Start session (creates session + initializes pipeline)
-            pipeline = await orchestrator.start_session(
+            await orchestrator.start_session(
                 session_id="e2e_test_session",
                 caller_id=call_metadata.caller_id,
                 call_metadata=call_metadata,
@@ -740,10 +740,10 @@ class TestComponentIntegration:
     async def test_concurrent_sessions_different_tenants(self, orchestrator):
         """
         Test concurrent sessions for different tenants.
-        
+
         Validates that multiple tenants can have active sessions simultaneously
         with proper isolation.
-        
+
         **Validates: Requirements 1.4, 11.5**
         """
         # Mock pipeline

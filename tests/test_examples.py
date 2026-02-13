@@ -107,7 +107,7 @@ async def test_async_with_fixture(test_data_dir: Path) -> None:
 @pytest.mark.integration
 def test_integration_example() -> None:
     """Example of an integration test.
-    
+
     Integration tests verify that multiple components work together correctly.
     """
     # This would test interaction between multiple components
@@ -121,7 +121,7 @@ def test_integration_example() -> None:
 @pytest.mark.slow
 def test_slow_operation() -> None:
     """Example of a test marked as slow.
-    
+
     Run slow tests with: pytest -m slow
     Skip slow tests with: pytest -m "not slow"
     """
@@ -135,7 +135,7 @@ def test_slow_operation() -> None:
 @pytest.mark.requires_api
 def test_external_api() -> None:
     """Example of a test that requires external API access.
-    
+
     Run API tests with: pytest -m requires_api
     Skip API tests with: pytest -m "not requires_api"
     """

@@ -401,7 +401,7 @@ class TestObservabilityPlatform:
 
 class TestLangSmithHeliconeIntegration:
     """Test suite for LangSmith and Helicone trace submission integration.
-    
+
     Requirements: 8.1, 8.2
     """
 
@@ -566,7 +566,7 @@ class TestLangSmithHeliconeIntegration:
 
 class TestSentimentAnalysisIntegration:
     """Test suite for sentiment analysis integration.
-    
+
     Requirements: 8.3
     """
 
@@ -678,7 +678,7 @@ class TestSentimentAnalysisIntegration:
 
 class TestHallucinationDetection:
     """Test suite for hallucination detection logic.
-    
+
     Requirements: 8.5
     """
 
@@ -741,7 +741,7 @@ class TestHallucinationDetection:
             "Your appointment is at 3:45 PM on December 25th with Dr. Smith in room 305. "
             * 20
         )
-        result_high = platform.detect_hallucination(response_high, {"facts": []})
+        platform.detect_hallucination(response_high, {"facts": []})
         # Should have high score due to multiple factors
 
     def test_hallucination_detection_stores_history(self, platform):
@@ -800,7 +800,7 @@ class TestHallucinationDetection:
 
 class TestAlertGeneration:
     """Test suite for alert generation functionality.
-    
+
     Requirements: 8.6
     """
 

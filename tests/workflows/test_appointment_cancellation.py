@@ -550,17 +550,17 @@ class TestAppointmentCancellationWorkflow:
         )
 
         # Step 1: Initial - should move to lookup
-        response1 = await workflow.process_turn(
+        await workflow.process_turn(
             session, "I want to cancel my appointment", {"appointment_id": "appt123"}
         )
         assert session.workflow_stage == CancelWorkflowStage.CONFIRMING_APPOINTMENT.value
 
         # Step 2: Confirm appointment
-        response2 = await workflow.process_turn(session, "Yes, that's the one", {})
+        await workflow.process_turn(session, "Yes, that's the one", {})
         assert session.workflow_stage == CancelWorkflowStage.COLLECTING_REASON.value
 
         # Step 3: Provide reason
-        response3 = await workflow.process_turn(
+        await workflow.process_turn(
             session, "I'm feeling better", {"reason": "feeling better"}
         )
         assert session.workflow_stage == CancelWorkflowStage.CONFIRMING_CANCELLATION.value

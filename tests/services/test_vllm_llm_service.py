@@ -76,7 +76,7 @@ async def vllm_service(vllm_config):
 class TestvLLMLLMServiceInitialization:
     """
     Test vLLM LLM service initialization.
-    
+
     **Validates: Requirements 13.3, 9.4**
     """
 
@@ -148,7 +148,7 @@ class TestvLLMLLMServiceInitialization:
 class TestServerAvailability:
     """
     Test vLLM server availability checking.
-    
+
     **Validates: Requirements 13.3**
     """
 
@@ -238,7 +238,7 @@ class TestServerAvailability:
 class TestGenerateResponse:
     """
     Test response generation with PagedAttention and continuous batching.
-    
+
     **Validates: Requirements 13.3, 9.4, 13.5**
     """
 
@@ -464,7 +464,7 @@ class TestGenerateResponse:
 class TestVoiceOptimization:
     """
     Test voice-optimized response formatting.
-    
+
     **Validates: Requirements 6.1, 6.2, 6.3**
     """
 
@@ -480,7 +480,7 @@ class TestVoiceOptimization:
 
         # Response with markdown and long text
         raw_response = """**Hello!** I'm here to help you.
-        
+
 - First point
 - Second point
 - Third point
@@ -647,7 +647,7 @@ class TestEmotionalTags:
 class TestGPUResourceManagement:
     """
     Test GPU resource management configuration.
-    
+
     **Validates: Requirements 9.4, 13.5**
     """
 
@@ -745,7 +745,7 @@ class TestPromptBuilding:
 class TestPagedAttentionIntegration:
     """
     Test PagedAttention integration for efficient memory management.
-    
+
     **Validates: Requirements 13.3, 9.4**
     """
 
@@ -773,7 +773,7 @@ class TestPagedAttentionIntegration:
 class TestContinuousBatching:
     """
     Test continuous batching configuration for high throughput.
-    
+
     **Validates: Requirements 9.4, 13.3**
     """
 

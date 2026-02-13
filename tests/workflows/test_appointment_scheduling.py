@@ -366,7 +366,7 @@ class TestConfirmation:
             selected_slot=test_slots[0]
         )
 
-        response = await workflow.process_turn(
+        await workflow.process_turn(
             session=test_session,
             user_transcript="no, I want a different time",
             extracted_params={}

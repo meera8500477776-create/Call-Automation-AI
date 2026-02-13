@@ -44,7 +44,7 @@ class STTConfig:
 class STTService:
     """
     Speech-to-Text service wrapper for Deepgram Nova.
-    
+
     Provides streaming transcription with WebSocket connection management,
     audio chunk processing, and callback handlers for interim and final results.
     """
@@ -52,7 +52,7 @@ class STTService:
     def __init__(self, config: STTConfig):
         """
         Initialize STT service.
-        
+
         Args:
             config: STT configuration including API key and model settings
         """
@@ -89,7 +89,7 @@ class STTService:
     def on_interim_result(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """
         Register callback for interim transcription results.
-        
+
         Args:
             callback: Function to call with (transcript, metadata) when interim result arrives
         """
@@ -99,7 +99,7 @@ class STTService:
     def on_final_result(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """
         Register callback for final transcription results.
-        
+
         Args:
             callback: Function to call with (transcript, metadata) when final result arrives
         """
@@ -109,7 +109,7 @@ class STTService:
     def on_error(self, callback: Callable[[Exception], None]) -> None:
         """
         Register callback for error events.
-        
+
         Args:
             callback: Function to call with exception when error occurs
         """
@@ -119,10 +119,10 @@ class STTService:
     async def connect(self, session_id: str) -> None:
         """
         Establish WebSocket connection to Deepgram.
-        
+
         Args:
             session_id: Unique identifier for this transcription session
-            
+
         Raises:
             ConnectionError: If connection fails after max retry attempts
         """
@@ -194,10 +194,10 @@ class STTService:
     async def send_audio(self, audio_chunk: bytes) -> None:
         """
         Send audio chunk for transcription.
-        
+
         Args:
             audio_chunk: Raw audio data bytes
-            
+
         Raises:
             RuntimeError: If not connected
             ValueError: If audio chunk is invalid
@@ -253,7 +253,7 @@ class STTService:
     def _on_message(self, *args, **kwargs) -> None:
         """
         Internal handler for message events from Deepgram.
-        
+
         Processes both interim and final transcripts and invokes appropriate callbacks.
         """
         try:

@@ -43,7 +43,7 @@ class TestToolExecutorProperties:
     def test_property_parameter_validation_rejects_missing_required(
         self, tool_name: str, required_param: str, param_value
     ):
-        """Property 8: Parameter validation - For any tool with a parameter schema, 
+        """Property 8: Parameter validation - For any tool with a parameter schema,
         invalid parameters should be rejected.
 
         **Validates: Requirements 10.4**

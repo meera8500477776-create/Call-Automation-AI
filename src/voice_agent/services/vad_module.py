@@ -27,7 +27,7 @@ class SpeechState(Enum):
 class VADResult:
     """
     Result of VAD processing.
-    
+
     Attributes:
         is_speech: Whether speech was detected in the audio chunk
         confidence: Detection confidence score (0.0 to 1.0)
@@ -42,7 +42,7 @@ class VADResult:
 class VADConfig:
     """
     Configuration for VAD module.
-    
+
     Attributes:
         sample_rate: Audio sample rate in Hz (8000 or 16000)
         threshold: Speech detection threshold (0.0 to 1.0, default 0.5)
@@ -60,7 +60,7 @@ class VADConfig:
 class VADModule:
     """
     Voice Activity Detection module using Silero VAD.
-    
+
     Provides real-time speech detection for turn-taking and barge-in functionality.
     Detects speech boundaries and invokes callbacks for speech start/end events.
     """
@@ -68,7 +68,7 @@ class VADModule:
     def __init__(self, config: VADConfig):
         """
         Initialize VAD module.
-        
+
         Args:
             config: VAD configuration including sample rate and thresholds
         """
@@ -98,7 +98,7 @@ class VADModule:
     def _load_model(self) -> None:
         """
         Load Silero VAD model from torch hub.
-        
+
         Raises:
             RuntimeError: If model loading fails
         """
@@ -123,7 +123,7 @@ class VADModule:
     def on_speech_start(self, callback: Callable[[float], None]) -> None:
         """
         Register callback for speech start events.
-        
+
         Args:
             callback: Function to call with timestamp when speech starts
         """
@@ -133,7 +133,7 @@ class VADModule:
     def on_speech_end(self, callback: Callable[[float], None]) -> None:
         """
         Register callback for speech end events.
-        
+
         Args:
             callback: Function to call with timestamp when speech ends
         """
@@ -143,12 +143,12 @@ class VADModule:
     def set_sensitivity(self, threshold: float) -> None:
         """
         Adjust speech detection sensitivity.
-        
+
         Args:
             threshold: Detection threshold (0.0 to 1.0)
                       Lower values = more sensitive (detect more speech)
                       Higher values = less sensitive (require clearer speech)
-                      
+
         Raises:
             ValueError: If threshold is not between 0.0 and 1.0
         """
@@ -161,13 +161,13 @@ class VADModule:
     def process_audio(self, audio_chunk: bytes) -> VADResult:
         """
         Process audio chunk and detect speech activity.
-        
+
         Args:
             audio_chunk: Raw audio data bytes (16-bit PCM)
-            
+
         Returns:
             VADResult containing detection result and metadata
-            
+
         Raises:
             ValueError: If audio chunk is invalid
             RuntimeError: If model is not loaded
@@ -225,7 +225,7 @@ class VADModule:
     def _update_state(self, result: VADResult) -> None:
         """
         Update internal state and trigger callbacks based on VAD result.
-        
+
         Args:
             result: VAD processing result
         """
@@ -274,7 +274,7 @@ class VADModule:
     def reset(self) -> None:
         """
         Reset VAD state and counters.
-        
+
         Useful when starting a new conversation or after a long pause.
         """
         self._state = SpeechState.SILENCE

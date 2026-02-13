@@ -40,7 +40,7 @@ class EncryptionService:
     """
     Encryption service providing AES-256-GCM encryption, TLS connections,
     and PII/PHI tokenization.
-    
+
     Requirements:
     - 7.2: TLS 1.2+ for all voice stream transmission
     - 7.3: AES-256 encryption for all stored data
@@ -50,7 +50,7 @@ class EncryptionService:
     def __init__(self, master_key: bytes | None = None, key_rotation_days: int = 90):
         """
         Initialize the encryption service.
-        
+
         Args:
             master_key: Master key for key derivation. If None, generates a new one.
             key_rotation_days: Number of days before key rotation is required.
@@ -71,11 +71,11 @@ class EncryptionService:
     def _derive_key(self, key_id: str, salt: bytes) -> bytes:
         """
         Derive an encryption key from the master key using PBKDF2.
-        
+
         Args:
             key_id: Identifier for the key
             salt: Salt for key derivation
-            
+
         Returns:
             Derived 256-bit key
         """
@@ -91,10 +91,10 @@ class EncryptionService:
     def _create_key(self, key_id: str) -> EncryptionKey:
         """
         Create a new encryption key.
-        
+
         Args:
             key_id: Identifier for the key
-            
+
         Returns:
             Created encryption key
         """
@@ -118,13 +118,13 @@ class EncryptionService:
     def _get_key(self, key_id: str) -> EncryptionKey:
         """
         Get an encryption key by ID, creating it if it doesn't exist.
-        
+
         Args:
             key_id: Identifier for the key
-            
+
         Returns:
             Encryption key
-            
+
         Raises:
             ValueError: If key is expired or inactive
         """
@@ -145,10 +145,10 @@ class EncryptionService:
     def rotate_key(self, key_id: str) -> EncryptionKey:
         """
         Rotate an encryption key by creating a new one and marking the old one inactive.
-        
+
         Args:
             key_id: Identifier for the key to rotate
-            
+
         Returns:
             New encryption key
         """
@@ -160,14 +160,14 @@ class EncryptionService:
     def encrypt_data(self, data: bytes, key_id: str = "default") -> bytes:
         """
         Encrypt data using AES-256-GCM.
-        
+
         Args:
             data: Data to encrypt
             key_id: Identifier for the encryption key to use
-            
+
         Returns:
             Encrypted data with nonce prepended (nonce + ciphertext + tag)
-            
+
         Raises:
             ValueError: If key is invalid or expired
         """
@@ -188,14 +188,14 @@ class EncryptionService:
     def decrypt_data(self, encrypted_data: bytes, key_id: str = "default") -> bytes:
         """
         Decrypt data using AES-256-GCM.
-        
+
         Args:
             encrypted_data: Encrypted data with nonce prepended
             key_id: Identifier for the encryption key to use
-            
+
         Returns:
             Decrypted data
-            
+
         Raises:
             ValueError: If key is invalid, expired, or decryption fails
         """
@@ -223,12 +223,12 @@ class EncryptionService:
     ) -> ssl.SSLContext:
         """
         Create an SSL context for TLS 1.2+ connections.
-        
+
         Args:
             hostname: Hostname to connect to
             port: Port number (default: 443)
             min_tls_version: Minimum TLS version (default: TLS 1.2)
-            
+
         Returns:
             Configured SSL context
         """
@@ -253,11 +253,11 @@ class EncryptionService:
     def tokenize_pii(self, text: str, pii_patterns: dict[str, str] | None = None) -> TokenizedText:
         """
         Tokenize PII/PHI in text by replacing sensitive data with tokens.
-        
+
         Args:
             text: Text containing PII/PHI
             pii_patterns: Optional dict mapping pattern names to regex patterns
-            
+
         Returns:
             TokenizedText with PII replaced by tokens
         """
@@ -301,10 +301,10 @@ class EncryptionService:
     def detokenize(self, tokenized_text: TokenizedText) -> str:
         """
         Restore original text from tokenized text.
-        
+
         Args:
             tokenized_text: TokenizedText with tokens
-            
+
         Returns:
             Original text with PII restored
         """

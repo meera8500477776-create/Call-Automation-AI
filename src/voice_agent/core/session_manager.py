@@ -8,7 +8,7 @@ from .session import ConversationTurn, Session
 
 class SessionStore(ABC):
     """Abstract interface for session persistence.
-    
+
     This interface defines the contract for session storage, allowing for
     different implementations (in-memory, database, etc.) without changing
     the SessionManager logic.
@@ -17,7 +17,7 @@ class SessionStore(ABC):
     @abstractmethod
     def save(self, session: Session) -> None:
         """Save or update a session.
-        
+
         Args:
             session: The session to save
         """
@@ -26,10 +26,10 @@ class SessionStore(ABC):
     @abstractmethod
     def get(self, session_id: str) -> Session | None:
         """Retrieve a session by ID.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             The session if found, None otherwise
         """
@@ -38,10 +38,10 @@ class SessionStore(ABC):
     @abstractmethod
     def delete(self, session_id: str) -> bool:
         """Delete a session.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             True if the session was deleted, False if not found
         """
@@ -50,7 +50,7 @@ class SessionStore(ABC):
     @abstractmethod
     def list_active_sessions(self) -> list[Session]:
         """List all active (not ended) sessions.
-        
+
         Returns:
             List of active sessions
         """
@@ -59,10 +59,10 @@ class SessionStore(ABC):
     @abstractmethod
     def get_by_caller(self, caller_id: str) -> list[Session]:
         """Get all sessions for a specific caller.
-        
+
         Args:
             caller_id: The caller identifier
-            
+
         Returns:
             List of sessions for this caller
         """
@@ -71,7 +71,7 @@ class SessionStore(ABC):
 
 class InMemorySessionStore(SessionStore):
     """In-memory implementation of session storage.
-    
+
     This implementation stores sessions in memory using a dictionary.
     Suitable for MVP and testing, but data is lost on restart.
     """
@@ -82,7 +82,7 @@ class InMemorySessionStore(SessionStore):
 
     def save(self, session: Session) -> None:
         """Save or update a session in memory.
-        
+
         Args:
             session: The session to save
         """
@@ -90,10 +90,10 @@ class InMemorySessionStore(SessionStore):
 
     def get(self, session_id: str) -> Session | None:
         """Retrieve a session from memory.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             The session if found, None otherwise
         """
@@ -101,10 +101,10 @@ class InMemorySessionStore(SessionStore):
 
     def delete(self, session_id: str) -> bool:
         """Delete a session from memory.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             True if the session was deleted, False if not found
         """
@@ -115,7 +115,7 @@ class InMemorySessionStore(SessionStore):
 
     def list_active_sessions(self) -> list[Session]:
         """List all active sessions in memory.
-        
+
         Returns:
             List of active sessions
         """
@@ -126,10 +126,10 @@ class InMemorySessionStore(SessionStore):
 
     def get_by_caller(self, caller_id: str) -> list[Session]:
         """Get all sessions for a specific caller from memory.
-        
+
         Args:
             caller_id: The caller identifier
-            
+
         Returns:
             List of sessions for this caller
         """
@@ -140,7 +140,7 @@ class InMemorySessionStore(SessionStore):
 
     def clear(self) -> None:
         """Clear all sessions from memory.
-        
+
         This method is useful for testing and cleanup.
         """
         self._sessions.clear()
@@ -148,7 +148,7 @@ class InMemorySessionStore(SessionStore):
 
 class SessionManager:
     """Manages conversation sessions and their lifecycle.
-    
+
     The SessionManager provides high-level operations for creating, updating,
     and managing conversation sessions. It uses a SessionStore for persistence,
     allowing different storage backends to be plugged in.
@@ -156,7 +156,7 @@ class SessionManager:
 
     def __init__(self, store: SessionStore | None = None) -> None:
         """Initialize the session manager.
-        
+
         Args:
             store: Session storage implementation. Defaults to InMemorySessionStore.
         """
@@ -170,13 +170,13 @@ class SessionManager:
         metadata: dict | None = None
     ) -> Session:
         """Create a new session.
-        
+
         Args:
             tenant_id: The tenant identifier
             caller_id: The caller identifier
             session_id: Optional custom session ID (auto-generated if not provided)
             metadata: Optional initial metadata
-            
+
         Returns:
             The newly created session
         """
@@ -194,10 +194,10 @@ class SessionManager:
 
     def get_session(self, session_id: str) -> Session | None:
         """Retrieve a session by ID.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             The session if found, None otherwise
         """
@@ -205,7 +205,7 @@ class SessionManager:
 
     def update_session(self, session: Session) -> None:
         """Update an existing session.
-        
+
         Args:
             session: The session to update
         """
@@ -222,7 +222,7 @@ class SessionManager:
         metadata: dict | None = None
     ) -> ConversationTurn | None:
         """Add a conversation turn to a session.
-        
+
         Args:
             session_id: The session identifier
             speaker: Speaker identifier ('user' or 'agent')
@@ -231,7 +231,7 @@ class SessionManager:
             parameters: Optional extracted parameters
             tool_calls: Optional list of tool names called
             metadata: Optional turn metadata
-            
+
         Returns:
             The created conversation turn, or None if session not found
         """
@@ -255,10 +255,10 @@ class SessionManager:
 
     def end_session(self, session_id: str) -> bool:
         """End a session and mark it as complete.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             True if the session was ended, False if not found
         """
@@ -277,15 +277,15 @@ class SessionManager:
         persist: bool = True
     ) -> dict | None:
         """Clean up session resources and optionally persist logs.
-        
+
         This method performs cleanup operations when a session ends,
         including finalizing the session, generating a summary, and
         optionally persisting conversation logs for audit purposes.
-        
+
         Args:
             session_id: The session identifier
             persist: Whether to persist the session (True) or delete it (False)
-            
+
         Returns:
             Session summary dictionary, or None if session not found
         """
@@ -326,10 +326,10 @@ class SessionManager:
 
     def delete_session(self, session_id: str) -> bool:
         """Delete a session from storage.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             True if the session was deleted, False if not found
         """
@@ -337,7 +337,7 @@ class SessionManager:
 
     def get_active_sessions(self) -> list[Session]:
         """Get all currently active sessions.
-        
+
         Returns:
             List of active sessions
         """
@@ -345,10 +345,10 @@ class SessionManager:
 
     def get_caller_sessions(self, caller_id: str) -> list[Session]:
         """Get all sessions for a specific caller.
-        
+
         Args:
             caller_id: The caller identifier
-            
+
         Returns:
             List of sessions for this caller
         """
@@ -360,11 +360,11 @@ class SessionManager:
         stage: str
     ) -> bool:
         """Update the workflow stage for a session.
-        
+
         Args:
             session_id: The session identifier
             stage: The new workflow stage
-            
+
         Returns:
             True if updated, False if session not found
         """
@@ -383,11 +383,11 @@ class SessionManager:
         limit: int | None = None
     ) -> list[ConversationTurn] | None:
         """Get conversation history for a session.
-        
+
         Args:
             session_id: The session identifier
             limit: Optional limit on number of turns to return (most recent)
-            
+
         Returns:
             List of conversation turns, or None if session not found
         """
@@ -408,15 +408,15 @@ class SessionManager:
         turn: ConversationTurn
     ) -> bool:
         """Update conversation context with a new turn.
-        
+
         This method adds a conversation turn to the session and updates
         the session's extracted parameters and current intent based on
         the turn's content.
-        
+
         Args:
             session_id: The session identifier
             turn: The conversation turn to add
-            
+
         Returns:
             True if updated successfully, False if session not found
         """
@@ -431,14 +431,14 @@ class SessionManager:
 
     def get_context(self, session_id: str) -> dict | None:
         """Get the current conversation context for a session.
-        
+
         Returns a dictionary containing the current conversation state,
         including conversation history, extracted parameters, current intent,
         and workflow stage.
-        
+
         Args:
             session_id: The session identifier
-            
+
         Returns:
             Dictionary with context information, or None if session not found
         """
@@ -467,16 +467,16 @@ class SessionManager:
         metadata: dict | None = None
     ) -> dict | None:
         """Initiate a transfer to a human agent.
-        
+
         This method marks the session for human handoff, records the transfer
         reason, and returns transfer information that can be used by the
         telephony system to route the call.
-        
+
         Args:
             session_id: The session identifier
             reason: Reason for the transfer (e.g., "user_request", "agent_limitation")
             metadata: Optional additional transfer metadata
-            
+
         Returns:
             Dictionary with transfer information, or None if session not found
         """

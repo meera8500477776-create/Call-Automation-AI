@@ -266,7 +266,7 @@ llm:
 
     def test_file_watching_auto_reload(self, temp_config_dir: Path):
         """Test automatic configuration reload on file change.
-        
+
         Note: This test verifies the file watching mechanism is set up correctly.
         The actual auto-reload behavior may be timing-dependent in test environments.
         """

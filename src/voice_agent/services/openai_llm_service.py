@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 class OpenAILLMService(LLMService):
     """
     OpenAI-based LLM service implementation.
-    
+
     Provides streaming support, function calling for tool execution,
     and voice-optimized prompt engineering for natural conversations.
     """
@@ -40,7 +40,7 @@ class OpenAILLMService(LLMService):
     def __init__(self, config: LLMConfig, api_key: str | None = None):
         """
         Initialize OpenAI LLM service.
-        
+
         Args:
             config: LLM configuration
             api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
@@ -62,17 +62,17 @@ class OpenAILLMService(LLMService):
     ) -> LLMResponse:
         """
         Generate response from user transcript using OpenAI.
-        
+
         Uses function calling to determine tool execution and applies
         voice-optimized prompt engineering for natural responses.
-        
+
         Args:
             transcript: User's transcribed speech
             context: Conversation context
-            
+
         Returns:
             Complete LLM response with intent, parameters, and text
-            
+
         Raises:
             RuntimeError: If OpenAI API request fails
         """
@@ -111,11 +111,11 @@ class OpenAILLMService(LLMService):
     ) -> list[ChatCompletionMessageParam]:
         """
         Build message list for OpenAI API with voice-optimized prompts.
-        
+
         Args:
             transcript: Current user transcript
             context: Conversation context
-            
+
         Returns:
             List of messages for OpenAI API
         """
@@ -149,13 +149,13 @@ class OpenAILLMService(LLMService):
     def _build_voice_optimized_system_prompt(self) -> str:
         """
         Build voice-optimized system prompt.
-        
+
         Incorporates requirements for voice-only responses:
         - No markdown, tables, or bullet points
         - Maximum 3 sentences per response
         - Empathetic, conversational language
         - Explicit knowledge boundaries
-        
+
         Returns:
             Voice-optimized system prompt
         """
@@ -182,10 +182,10 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     def _create_function_definitions(self) -> list[dict[str, Any]]:
         """
         Create OpenAI function definitions for tool execution.
-        
+
         Defines available tools that the LLM can call for appointment
         management and other operations.
-        
+
         Returns:
             List of function definitions in OpenAI format
         """
@@ -287,14 +287,14 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     ) -> LLMResponse:
         """
         Parse OpenAI response into LLMResponse format.
-        
+
         Handles both regular text responses and function calls,
         extracting intent, parameters, and tool calls.
-        
+
         Args:
             response: OpenAI API response
             original_transcript: Original user transcript
-            
+
         Returns:
             Parsed LLM response
         """
@@ -372,10 +372,10 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     def _map_function_to_intent(self, function_name: str) -> str:
         """
         Map OpenAI function name to intent type.
-        
+
         Args:
             function_name: Name of the called function
-            
+
         Returns:
             Intent type string
         """
@@ -390,11 +390,11 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     def _generate_default_response(self, tool_name: str, parameters: dict[str, Any]) -> str:
         """
         Generate default response when function call has no accompanying text.
-        
+
         Args:
             tool_name: Name of the tool being called
             parameters: Tool parameters
-            
+
         Returns:
             Default response text
         """
@@ -417,13 +417,13 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
     def _extract_emotional_tags(self, text: str) -> list[str]:
         """
         Extract emotional tags for TTS from response text.
-        
+
         Looks for emotional indicators in the text that can be
         used by TTS services for more natural speech synthesis.
-        
+
         Args:
             text: Response text
-            
+
         Returns:
             List of emotional tags
         """

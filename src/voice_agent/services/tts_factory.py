@@ -34,7 +34,7 @@ class ProviderHealth(Enum):
 class TTSProviderFactory:
     """
     Factory for creating TTS service instances with health checking and failover.
-    
+
     Provides a consistent interface for creating TTS providers based on
     tenant configuration, with automatic health checking and failover from
     ElevenLabs to OpenAI when primary provider is unavailable.
@@ -48,7 +48,7 @@ class TTSProviderFactory:
     ):
         """
         Initialize TTS provider factory.
-        
+
         Args:
             elevenlabs_api_key: ElevenLabs API key (if None, uses ELEVENLABS_API_KEY env var)
             openai_api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
@@ -73,19 +73,19 @@ class TTSProviderFactory:
     ) -> ElevenLabsTTSService | OpenAITTSService:
         """
         Create TTS service instance based on configuration.
-        
+
         Selects the appropriate provider implementation based on the
         voice_config.provider field and creates an instance with proper
         configuration. If failover is enabled and ElevenLabs is unavailable,
         automatically creates OpenAI fallback service.
-        
+
         Args:
             voice_config: Voice configuration specifying provider and voice settings
             provider_config: Optional provider-specific configuration
-            
+
         Returns:
             Configured TTS service instance
-            
+
         Raises:
             ValueError: If provider is not supported
             RuntimeError: If provider creation fails and no fallback available
@@ -129,14 +129,14 @@ class TTSProviderFactory:
     ) -> ElevenLabsTTSService | OpenAITTSService:
         """
         Create provider instance without failover logic.
-        
+
         Args:
             voice_config: Voice configuration
             provider_config: Provider-specific configuration
-            
+
         Returns:
             TTS service instance
-            
+
         Raises:
             ValueError: If provider is not supported
         """
@@ -171,16 +171,16 @@ class TTSProviderFactory:
     ) -> ElevenLabsTTSService | OpenAITTSService:
         """
         Create service with automatic failover to OpenAI.
-        
+
         Failover strategy: ElevenLabs → OpenAI
-        
+
         Args:
             voice_config: Original voice configuration
             provider_config: Provider-specific configuration
-            
+
         Returns:
             TTS service instance (primary or fallback)
-            
+
         Raises:
             RuntimeError: If all providers fail
         """
@@ -219,14 +219,14 @@ class TTSProviderFactory:
     async def check_provider_health(self, provider: str) -> ProviderHealth:
         """
         Check health status of a provider.
-        
+
         Performs lightweight health check to determine if provider is
         available and responsive. Results are cached to avoid excessive
         health checks.
-        
+
         Args:
             provider: Provider name ("elevenlabs" or "openai")
-            
+
         Returns:
             Provider health status
         """
@@ -264,7 +264,7 @@ class TTSProviderFactory:
     async def _check_elevenlabs_health(self) -> ProviderHealth:
         """
         Check ElevenLabs API health.
-        
+
         Returns:
             Provider health status
         """
@@ -301,7 +301,7 @@ class TTSProviderFactory:
     async def get_all_provider_health(self) -> dict[str, ProviderHealth]:
         """
         Get health status for all supported providers.
-        
+
         Returns:
             Dictionary mapping provider names to health status
         """

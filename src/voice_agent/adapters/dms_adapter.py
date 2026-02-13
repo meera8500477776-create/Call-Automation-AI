@@ -23,7 +23,7 @@ class DateRange:
 class ServiceSlot:
     """
     Represents an available service appointment slot.
-    
+
     Requirements: 4.6
     """
     id: str
@@ -40,7 +40,7 @@ class ServiceSlot:
 class ServiceAppointment:
     """
     Represents a booked service appointment.
-    
+
     Requirements: 4.6
     """
     id: str
@@ -60,7 +60,7 @@ class ServiceAppointment:
 class MaintenanceQuote:
     """
     Represents a maintenance service quote.
-    
+
     Requirements: 4.6
     """
     quote_id: str
@@ -79,7 +79,7 @@ class MaintenanceQuote:
 class PartAvailability:
     """
     Represents parts availability information.
-    
+
     Requirements: 4.6
     """
     part_number: str
@@ -94,7 +94,7 @@ class PartAvailability:
 class TriageResult:
     """
     Represents emergency triage assessment result.
-    
+
     Requirements: 4.6
     """
     severity: str  # "critical", "urgent", "moderate", "low"
@@ -108,11 +108,11 @@ class TriageResult:
 class DMSAdapter:
     """
     DMS adapter for Dealership Management System integration.
-    
+
     Supports automotive service scheduling including slot search, booking,
     VIN-based vehicle identification, maintenance quotes, emergency triage,
     and parts availability checking.
-    
+
     Requirements:
     - 4.2: DMS integration for automotive industry
     - 4.6: Service scheduling, maintenance quotes, and emergency triage
@@ -139,7 +139,7 @@ class DMSAdapter:
     ):
         """
         Initialize the DMS adapter.
-        
+
         Args:
             base_url: Base URL of the DMS API (e.g., "https://api.dealership.com/v1")
             dealer_id: Dealership identifier
@@ -155,12 +155,12 @@ class DMSAdapter:
     async def authenticate(self) -> bool:
         """
         Authenticate with the DMS API using API key.
-        
+
         Requirements: 4.2
-        
+
         Returns:
             True if authentication successful
-            
+
         Raises:
             ValueError: If authentication fails
         """
@@ -206,16 +206,16 @@ class DMSAdapter:
     ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the DMS API.
-        
+
         Args:
             method: HTTP method (GET, POST, PUT, DELETE)
             endpoint: API endpoint path
             data: Optional request body data
             params: Optional query parameters
-            
+
         Returns:
             Response data as dictionary
-            
+
         Raises:
             ValueError: If request fails
         """
@@ -258,12 +258,12 @@ class DMSAdapter:
     def _parse_service_slot(self, slot_data: dict[str, Any]) -> ServiceSlot:
         """
         Parse a service slot from DMS API response.
-        
+
         Requirements: 4.6
-        
+
         Args:
             slot_data: Service slot data as dictionary
-            
+
         Returns:
             Parsed ServiceSlot object
         """
@@ -281,12 +281,12 @@ class DMSAdapter:
     def _parse_service_appointment(self, appointment_data: dict[str, Any]) -> ServiceAppointment:
         """
         Parse a service appointment from DMS API response.
-        
+
         Requirements: 4.6
-        
+
         Args:
             appointment_data: Service appointment data as dictionary
-            
+
         Returns:
             Parsed ServiceAppointment object
         """
@@ -312,17 +312,17 @@ class DMSAdapter:
     ) -> list[ServiceSlot]:
         """
         Search for available service appointment slots.
-        
+
         Requirements: 4.6
-        
+
         Args:
             vehicle_id: Vehicle identifier (VIN or internal ID)
             service_type: Type of service (e.g., "oil_change", "tire_rotation", "diagnostics")
             date_range: Date range for service appointment search
-            
+
         Returns:
             List of available ServiceSlot objects
-            
+
         Raises:
             ValueError: If search operation fails
         """
@@ -367,19 +367,19 @@ class DMSAdapter:
     ) -> ServiceAppointment:
         """
         Book a service appointment.
-        
+
         Requirements: 4.6
-        
+
         Args:
             vehicle_id: Vehicle identifier
             slot_id: Service slot identifier to book
             service_type: Type of service
             vin: Vehicle Identification Number (optional, for VIN-based identification)
             notes: Optional notes for the service appointment
-            
+
         Returns:
             Created ServiceAppointment object
-            
+
         Raises:
             ValueError: If booking operation fails or validation fails
         """
@@ -418,12 +418,12 @@ class DMSAdapter:
     def classify_service_type(self, service_type: str) -> dict[str, Any]:
         """
         Classify a service type and return its metadata.
-        
+
         Requirements: 4.6
-        
+
         Args:
             service_type: Type of service to classify
-            
+
         Returns:
             Dictionary with service classification metadata including category and typical duration
         """
@@ -444,17 +444,17 @@ class DMSAdapter:
     ) -> MaintenanceQuote:
         """
         Retrieve a maintenance service quote with pricing and parts availability.
-        
+
         Requirements: 4.6
-        
+
         Args:
             vehicle_id: Vehicle identifier
             service_type: Type of service (e.g., "oil_change", "tire_rotation", "diagnostics")
             vin: Vehicle Identification Number (optional)
-            
+
         Returns:
             MaintenanceQuote object with pricing and availability information
-            
+
         Raises:
             ValueError: If quote retrieval fails
         """
@@ -503,17 +503,17 @@ class DMSAdapter:
     ) -> list[PartAvailability]:
         """
         Check parts availability for a specific service.
-        
+
         Requirements: 4.6
-        
+
         Args:
             vehicle_id: Vehicle identifier
             service_type: Type of service
             vin: Vehicle Identification Number (optional)
-            
+
         Returns:
             List of PartAvailability objects
-            
+
         Raises:
             ValueError: If parts check fails
         """
@@ -562,17 +562,17 @@ class DMSAdapter:
     ) -> TriageResult:
         """
         Assess the severity of a vehicle issue and provide emergency triage.
-        
+
         Requirements: 4.6
-        
+
         Args:
             vehicle_id: Vehicle identifier
             issue_description: Description of the vehicle issue
             vin: Vehicle Identification Number (optional)
-            
+
         Returns:
             TriageResult object with severity assessment and recommendations
-            
+
         Raises:
             ValueError: If triage assessment fails
         """

@@ -95,9 +95,9 @@ class TestCompleteCallFlow:
     ):
         """
         Test complete call flow for healthcare appointment booking.
-        
+
         Flow: Twilio → Orchestrator → STT → LLM → FHIR → LLM → TTS → Twilio
-        
+
         **Validates: Requirements 1.3, 2.1, 3.2, 3.3, 11.1, 11.2**
         """
         # Setup orchestrator with mocked components
@@ -194,9 +194,9 @@ class TestCompleteCallFlow:
     ):
         """
         Test complete call flow for automotive service booking.
-        
+
         Flow: Twilio → Orchestrator → STT → LLM → DMS → LLM → TTS → Twilio
-        
+
         **Validates: Requirements 1.3, 4.2, 11.1, 11.2**
         """
         # Setup mock DMS adapter
@@ -287,7 +287,7 @@ class TestMultiTenantRouting:
     async def test_concurrent_calls_different_tenants(self):
         """
         Test concurrent calls routed to different tenants.
-        
+
         **Validates: Requirements 1.3, 1.4**
         """
         with patch('src.voice_agent.core.pipecat_orchestrator.TenantRegistry') as mock_registry_class:
@@ -405,7 +405,7 @@ class TestLatencyRequirements:
     async def test_end_to_end_latency_under_1000ms(self, latency_monitor):
         """
         Test that end-to-end latency is under 1000ms.
-        
+
         **Validates: Requirements 2.1, 2.8**
         """
         session_id = "latency_test_session"
@@ -449,7 +449,7 @@ class TestLatencyRequirements:
     async def test_latency_monitoring_across_multiple_turns(self, latency_monitor):
         """
         Test latency monitoring across multiple conversation turns.
-        
+
         **Validates: Requirements 2.7, 2.8**
         """
         session_id = "multi_turn_session"
@@ -484,7 +484,7 @@ class TestErrorScenariosAndGracefulDegradation:
     async def test_fhir_api_failure_graceful_degradation(self, mock_fhir_adapter):
         """
         Test graceful degradation when FHIR API fails.
-        
+
         **Validates: Requirements 3.7, 10.5**
         """
         # Setup FHIR adapter to fail
@@ -507,7 +507,7 @@ class TestErrorScenariosAndGracefulDegradation:
     async def test_llm_service_timeout_handling(self):
         """
         Test handling of LLM service timeouts.
-        
+
         **Validates: Requirements 10.5**
         """
         # Simulate LLM timeout
@@ -527,7 +527,7 @@ class TestErrorScenariosAndGracefulDegradation:
     async def test_session_cleanup_on_unexpected_disconnect(self):
         """
         Test session cleanup when call disconnects unexpectedly.
-        
+
         **Validates: Requirements 11.6**
         """
         with patch('src.voice_agent.core.pipecat_orchestrator.TenantRegistry') as mock_registry_class:
@@ -587,11 +587,11 @@ class TestHumanHandoffScenarios:
     async def test_transfer_to_human_on_workflow_failure(self):
         """
         Test transfer to human agent when workflow fails.
-        
+
         **Validates: Requirements 10.6**
         """
         session_manager = SessionManager()
-        session = session_manager.create_session(
+        session_manager.create_session(
             session_id="handoff_test",
             tenant_id="healthcare_clinic_001",
             caller_id="+15551234567",
@@ -615,7 +615,7 @@ class TestHumanHandoffScenarios:
     async def test_transfer_on_missing_patient_information(self):
         """
         Test transfer when patient information is missing.
-        
+
         **Validates: Requirements 10.6**
         """
         session_manager = SessionManager()
