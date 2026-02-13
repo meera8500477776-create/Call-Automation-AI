@@ -1,0 +1,33 @@
+# Sample tenant configuration for testing
+tenant_id: test_healthcare_clinic
+persona:
+  name: "Sarah"
+  voice_id: "test_voice_id"
+  system_prompt: "You are Sarah, a friendly medical receptionist helping patients schedule appointments."
+
+llm:
+  provider: "openai"
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 150
+
+tools:
+  - name: "search_appointments"
+    type: "fhir"
+    endpoint: "https://test-fhir.example.com/api/FHIR/R4"
+    auth_type: "oauth2"
+    scopes: ["patient/Appointment.read"]
+  
+  - name: "book_appointment"
+    type: "fhir"
+    endpoint: "https://test-fhir.example.com/api/FHIR/R4"
+    auth_type: "oauth2"
+    scopes: ["patient/Appointment.write"]
+
+knowledge_bases:
+  - type: "vector_db"
+    source: "clinic_policies.pdf"
+
+constraints:
+  max_call_duration: 600
+  response_brevity: 3
