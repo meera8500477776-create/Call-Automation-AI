@@ -19,7 +19,7 @@ The Config-Driven Voice Agent Platform enables appointment scheduling, reschedul
 
 The platform addresses the enterprise telecommunications transformation from rigid IVR systems to autonomous AI agents capable of executing complex, multi-turn workflows with human-like prosody and semantic comprehension. By decoupling core conversational intelligence from domain-specific business logic, a single platform seamlessly transitions between industries simply by loading different configuration payloads.
 
-## Hackathon Achievement
+## Hackathon
 
 This platform won the grand prize at the SpinSci AI Hackathon 2025, competing against 20 shortlisted teams from across India. The event took place on January 14-15, 2025, at T-Hub, Hyderabad.
 
