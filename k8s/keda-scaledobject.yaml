@@ -1,0 +1,62 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: voice-agent-gpu-scaler
+  namespace: voice-agent
+spec:
+  scaleTargetRef:
+    name: voice-agent-gpu
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+  # Scale based on Prometheus metrics for concurrent calls
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: voice_agent_concurrent_calls
+      query: sum(voice_agent_active_sessions{service="voice-agent-gpu"})
+      threshold: "50"
+  # Scale based on GPU utilization
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: gpu_utilization
+      query: avg(nvidia_gpu_duty_cycle{pod=~"voice-agent-gpu.*"})
+      threshold: "70"
+  # Scale based on request queue depth
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: request_queue_depth
+      query: sum(voice_agent_request_queue_depth{service="voice-agent-gpu"})
+      threshold: "100"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: voice-agent-scaler
+  namespace: voice-agent
+spec:
+  scaleTargetRef:
+    name: voice-agent
+  minReplicaCount: 3
+  maxReplicaCount: 50
+  pollingInterval: 10
+  cooldownPeriod: 60
+  triggers:
+  # Scale based on concurrent calls
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: voice_agent_concurrent_calls
+      query: sum(voice_agent_active_sessions{service="voice-agent"})
+      threshold: "100"
+  # Scale based on average response latency
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus.monitoring.svc.cluster.local:9090
+      metricName: avg_response_latency
+      query: avg(voice_agent_end_to_end_latency_ms{service="voice-agent"})
+      threshold: "800"

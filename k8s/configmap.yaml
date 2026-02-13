@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voice-agent-config
+  namespace: voice-agent
+data:
+  log_level: "INFO"
+  max_concurrent_calls: "1000"
+  latency_threshold_ms: "1000"
+  enable_observability: "true"
+  
+  # Tenant configuration files can be mounted here
+  # Or loaded from external sources like S3/ConfigMap volumes

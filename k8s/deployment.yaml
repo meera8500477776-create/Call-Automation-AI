@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voice-agent
+  namespace: voice-agent
+  labels:
+    app: voice-agent
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: voice-agent
+  template:
+    metadata:
+      labels:
+        app: voice-agent
+        version: v1
+    spec:
+      containers:
+      - name: voice-agent
+        image: voice-agent:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: voice-agent-config
+              key: log_level
+        - name: DEEPGRAM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: voice-agent-secrets
+              key: deepgram_api_key
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: voice-agent-secrets
+              key: openai_api_key
+        - name: ELEVENLABS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: voice-agent-secrets
+              key: elevenlabs_api_key
+        - name: TWILIO_ACCOUNT_SID
+          valueFrom:
+            secretKeyRef:
+              name: voice-agent-secrets
+              key: twilio_account_sid
+        - name: TWILIO_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: voice-agent-secrets
+              key: twilio_auth_token
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: voice-agent-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voice-agent-gpu
+  namespace: voice-agent
+  labels:
+    app: voice-agent-gpu
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: voice-agent-gpu
+  template:
+    metadata:
+      labels:
+        app: voice-agent-gpu
+        version: v1
+    spec:
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        ports:
+        - containerPort: 8001
+          name: http
+        env:
+        - name: MODEL_NAME
+          value: "meta-llama/Llama-2-7b-chat-hf"
+        resources:
+          requests:
+            memory: "16Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "32Gi"
+            cpu: "8000m"
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: model-cache
+          mountPath: /root/.cache/huggingface
+      volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: model-cache-pvc
+      nodeSelector:
+        gpu: "true"
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
