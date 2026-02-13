@@ -1,0 +1,46 @@
+MIT License
+
+Copyright (c) 2025 SpinSci AI Hackathon 2025 Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+ACKNOWLEDGMENTS
+
+This project was developed as the grand prize winning solution at the SpinSci AI 
+Hackathon 2025, held on January 14-15, 2025, at T-Hub, Hyderabad, India.
+
+The team would like to thank:
+- SpinSci Technologies for hosting the hackathon and providing the problem statement
+- Amrita School of Artificial Intelligence, Coimbatore, Amrita Vishwa Vidyapeetham
+- T-Hub, Hyderabad for providing the venue and infrastructure
+- All mentors and organizers who made this event possible
+
+HACKATHON ACHIEVEMENT
+
+Grand Prize Winner
+Event: SpinSci AI Hackathon 2025
+Date: January 14-15, 2025
+Location: T-Hub, Hyderabad, India
+
+The MVP was developed in just 6.5 hours, demonstrating rapid innovation and 
+adaptability under pressure. The solution focused on AI-powered patient engagement 
+through automated appointment scheduling, rescheduling, and cancellation via 
+voice-enabled real-time calls using Twilio, GPT-3.5, and Ollama.
