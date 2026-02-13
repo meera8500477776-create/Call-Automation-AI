@@ -49,6 +49,7 @@ logs/
 
 # Data
 data/
+!tests/data/
 *.db
 *.sqlite
 
