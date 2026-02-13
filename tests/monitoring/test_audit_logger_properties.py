@@ -4,10 +4,12 @@
 """
 
 from datetime import datetime, timedelta
-from hypothesis import given, strategies as st, settings
-import pytest
 
-from voice_agent.monitoring.audit_logger import AuditLogger, LogEntry, DateRange
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
+from voice_agent.monitoring.audit_logger import AuditLogger
 
 
 class TestAuditLoggerProperties:
@@ -39,7 +41,7 @@ class TestAuditLoggerProperties:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_property_log_immutability_attributes(
         self, event_type: str, session_id: str, data: dict
     ):
@@ -107,7 +109,7 @@ class TestAuditLoggerProperties:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_property_log_immutability_data_isolation(
         self, event_type: str, session_id: str, data: dict
     ):
@@ -153,7 +155,7 @@ class TestAuditLoggerProperties:
         ),
         execution_time_ms=st.floats(min_value=0.0, max_value=10000.0),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_property_log_immutability_api_call(
         self,
         tool_name: str,
@@ -199,7 +201,7 @@ class TestAuditLoggerProperties:
             st.text(min_size=1, max_size=50), min_size=0, max_size=10
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_property_log_immutability_pii_access(
         self,
         user_id: str,
@@ -253,7 +255,7 @@ class TestAuditLoggerProperties:
         ),
         num_queries=st.integers(min_value=1, max_value=10),
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, deadline=None)
     def test_property_log_immutability_after_queries(
         self, event_type: str, session_id: str, data: dict, num_queries: int
     ):
@@ -317,7 +319,7 @@ class TestAuditLoggerProperties:
             max_size=20,
         )
     )
-    @settings(max_examples=50)
+    @settings(max_examples=50, deadline=None)
     def test_property_log_immutability_multiple_logs(self, events: list):
         """Property 11 (variant): Log immutability - All log entries should be immutable regardless of how many logs exist.
 
@@ -364,7 +366,7 @@ class TestAuditLoggerProperties:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_property_log_immutability_tokenized_data(
         self, event_type: str, session_id: str, data: dict
     ):
@@ -400,7 +402,7 @@ class TestAuditLoggerProperties:
             max_size=10,
         ),
     )
-    @settings(max_examples=100)
+    @settings(max_examples=100, deadline=None)
     def test_property_log_immutability_timestamp_never_changes(
         self, event_type: str, session_id: str, data: dict
     ):

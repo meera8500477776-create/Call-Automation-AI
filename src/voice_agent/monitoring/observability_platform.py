@@ -9,7 +9,7 @@ Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from voice_agent.monitoring.logger import get_logger
 
@@ -41,7 +41,7 @@ class HallucinationScore:
 
     score: float  # 0.0 (no hallucination) to 1.0 (likely hallucination)
     confidence: float  # 0.0 to 1.0
-    reasons: List[str]  # List of reasons for detection
+    reasons: list[str]  # List of reasons for detection
     is_hallucination: bool  # True if score exceeds threshold
 
 
@@ -96,8 +96,8 @@ class ObservabilityPlatform:
 
     def __init__(
         self,
-        langsmith_api_key: Optional[str] = None,
-        helicone_api_key: Optional[str] = None,
+        langsmith_api_key: str | None = None,
+        helicone_api_key: str | None = None,
         twilio_ci_enabled: bool = False,
     ):
         """
@@ -113,10 +113,10 @@ class ObservabilityPlatform:
         self._twilio_ci_enabled = twilio_ci_enabled
 
         # In-memory storage for metrics (in production, use time-series DB)
-        self._traces: List[Dict[str, Any]] = []
-        self._alerts: List[Dict[str, Any]] = []
-        self._sentiment_history: List[SentimentResult] = []
-        self._hallucination_history: List[HallucinationScore] = []
+        self._traces: list[dict[str, Any]] = []
+        self._alerts: list[dict[str, Any]] = []
+        self._sentiment_history: list[SentimentResult] = []
+        self._hallucination_history: list[HallucinationScore] = []
 
         # Metrics counters
         self._active_sessions = 0
@@ -135,7 +135,7 @@ class ObservabilityPlatform:
     def trace_interaction(
         self,
         session_id: str,
-        trace_data: Dict[str, Any],
+        trace_data: dict[str, Any],
     ) -> None:
         """
         Send end-to-end trace to LangSmith or Helicone.
@@ -237,7 +237,7 @@ class ObservabilityPlatform:
     def detect_hallucination(
         self,
         response: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> HallucinationScore:
         """
         Detect potential hallucinations in LLM responses.
@@ -334,7 +334,7 @@ class ObservabilityPlatform:
         self,
         alert_type: str,
         severity: AlertSeverity,
-        details: Dict[str, Any],
+        details: dict[str, Any],
     ) -> None:
         """
         Generate alert for threshold violations or system issues.
@@ -491,12 +491,12 @@ class ObservabilityPlatform:
 
     # Private helper methods
 
-    def _send_to_langsmith(self, trace_entry: Dict[str, Any]) -> None:
+    def _send_to_langsmith(self, trace_entry: dict[str, Any]) -> None:
         """Send trace to LangSmith (placeholder for production implementation)."""
         # In production, use LangSmith SDK
         logger.debug("Would send trace to LangSmith", trace_id=trace_entry.get("session_id"))
 
-    def _send_to_helicone(self, trace_entry: Dict[str, Any]) -> None:
+    def _send_to_helicone(self, trace_entry: dict[str, Any]) -> None:
         """Send trace to Helicone (placeholder for production implementation)."""
         # In production, use Helicone SDK
         logger.debug("Would send trace to Helicone", trace_id=trace_entry.get("session_id"))

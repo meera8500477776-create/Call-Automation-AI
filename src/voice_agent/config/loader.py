@@ -1,8 +1,7 @@
 """Configuration file loader for YAML and TOML formats."""
 
-import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import toml
 import yaml
@@ -12,7 +11,7 @@ class ConfigLoader:
     """Loads configuration from YAML or TOML files."""
 
     @staticmethod
-    def load_yaml(file_path: Path) -> Dict[str, Any]:
+    def load_yaml(file_path: Path) -> dict[str, Any]:
         """Load configuration from YAML file.
 
         Args:
@@ -28,7 +27,7 @@ class ConfigLoader:
         if not file_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {file_path}")
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             try:
                 config = yaml.safe_load(f)
                 return config if config is not None else {}
@@ -36,7 +35,7 @@ class ConfigLoader:
                 raise ValueError(f"Invalid YAML in {file_path}: {e}") from e
 
     @staticmethod
-    def load_toml(file_path: Path) -> Dict[str, Any]:
+    def load_toml(file_path: Path) -> dict[str, Any]:
         """Load configuration from TOML file.
 
         Args:
@@ -53,13 +52,13 @@ class ConfigLoader:
             raise FileNotFoundError(f"Configuration file not found: {file_path}")
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 return toml.load(f)
         except toml.TomlDecodeError as e:
             raise ValueError(f"Invalid TOML in {file_path}: {e}") from e
 
     @staticmethod
-    def load(file_path: Path) -> Dict[str, Any]:
+    def load(file_path: Path) -> dict[str, Any]:
         """Load configuration from file, auto-detecting format.
 
         Args:
@@ -85,7 +84,7 @@ class ConfigLoader:
             )
 
     @staticmethod
-    def save_yaml(config: Dict[str, Any], file_path: Path) -> None:
+    def save_yaml(config: dict[str, Any], file_path: Path) -> None:
         """Save configuration to YAML file.
 
         Args:
@@ -97,7 +96,7 @@ class ConfigLoader:
             yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False)
 
     @staticmethod
-    def save_toml(config: Dict[str, Any], file_path: Path) -> None:
+    def save_toml(config: dict[str, Any], file_path: Path) -> None:
         """Save configuration to TOML file.
 
         Args:

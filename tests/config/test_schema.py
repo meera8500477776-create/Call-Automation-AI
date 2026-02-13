@@ -13,8 +13,6 @@ from voice_agent.config.schema import (
     TenantConfig,
     ToolDefinition,
     ToolType,
-    TTSConfig,
-    TTSProvider,
     VoiceSettings,
 )
 
@@ -37,7 +35,7 @@ class TestPersonaConfig:
         """Test that missing required fields raise validation error."""
         with pytest.raises(ValidationError) as exc_info:
             PersonaConfig(name="Sarah")
-        
+
         errors = exc_info.value.errors()
         error_fields = {e["loc"][0] for e in errors}
         assert "voice_id" in error_fields
@@ -52,7 +50,7 @@ class TestPersonaConfig:
                 system_prompt="Prompt",
                 extra_field="not_allowed",
             )
-        
+
         errors = exc_info.value.errors()
         assert any("extra_field" in str(e["loc"]) for e in errors)
 
@@ -85,7 +83,7 @@ class TestVoiceSettings:
         """Test that values are constrained to 0.0-1.0 range."""
         with pytest.raises(ValidationError):
             VoiceSettings(stability=1.5)
-        
+
         with pytest.raises(ValidationError):
             VoiceSettings(similarity_boost=-0.1)
 
@@ -116,7 +114,7 @@ class TestLLMConfig:
         """Test that temperature is constrained to valid range."""
         with pytest.raises(ValidationError):
             LLMConfig(provider=LLMProvider.OPENAI, model="gpt-4", temperature=2.5)
-        
+
         with pytest.raises(ValidationError):
             LLMConfig(provider=LLMProvider.OPENAI, model="gpt-4", temperature=-0.1)
 
@@ -124,7 +122,7 @@ class TestLLMConfig:
         """Test that max_tokens must be positive."""
         with pytest.raises(ValidationError):
             LLMConfig(provider=LLMProvider.OPENAI, model="gpt-4", max_tokens=0)
-        
+
         with pytest.raises(ValidationError):
             LLMConfig(provider=LLMProvider.OPENAI, model="gpt-4", max_tokens=-10)
 
@@ -159,7 +157,7 @@ class TestToolDefinition:
                 auth_type=AuthType.OAUTH2,
                 parameters_schema={"type": "object"},
             )
-        
+
         errors = exc_info.value.errors()
         assert any("scopes" in str(e) for e in errors)
 
@@ -188,7 +186,7 @@ class TestToolDefinition:
                 auth_type=AuthType.API_KEY,
                 parameters_schema={"type": "object"},
             )
-        
+
         errors = exc_info.value.errors()
         assert any("api_key_name" in str(e) for e in errors)
 
@@ -221,7 +219,7 @@ class TestConstraintsConfig:
         """Test that max_call_duration must be positive."""
         with pytest.raises(ValidationError):
             ConstraintsConfig(max_call_duration=0)
-        
+
         with pytest.raises(ValidationError):
             ConstraintsConfig(max_call_duration=-100)
 
@@ -229,7 +227,7 @@ class TestConstraintsConfig:
         """Test that response_brevity is constrained to valid range."""
         with pytest.raises(ValidationError):
             ConstraintsConfig(response_brevity=0)
-        
+
         with pytest.raises(ValidationError):
             ConstraintsConfig(response_brevity=11)
 
@@ -324,7 +322,7 @@ class TestTenantConfig:
                     ),
                 ],
             )
-        
+
         errors = exc_info.value.errors()
         assert any("unique" in str(e).lower() for e in errors)
 

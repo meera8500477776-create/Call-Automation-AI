@@ -1,8 +1,8 @@
 """Telephony integration modules for voice agent platform."""
 
 from .twilio_integration import (
-    TwilioConfig,
     CallMetadata,
+    TwilioConfig,
     TwilioIntegration,
 )
 

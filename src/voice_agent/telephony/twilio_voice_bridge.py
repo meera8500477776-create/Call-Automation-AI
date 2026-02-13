@@ -10,13 +10,13 @@ coordination.
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
-from .twilio_integration import TwilioIntegration, CallMetadata as TwilioCallMetadata
-from ..core.voice_pipeline import VoicePipeline, LatencyMetrics
-from ..core.pipecat_orchestrator import PipecatOrchestrator, CallMetadata as OrchestratorCallMetadata
-
+from ..core.pipecat_orchestrator import CallMetadata as OrchestratorCallMetadata
+from ..core.pipecat_orchestrator import PipecatOrchestrator
+from ..core.voice_pipeline import LatencyMetrics, VoicePipeline
+from .twilio_integration import CallMetadata as TwilioCallMetadata
+from .twilio_integration import TwilioIntegration
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,10 @@ class TwilioVoiceBridge:
         self.config = config
         self._twilio = twilio_integration
         self._orchestrator = orchestrator
-        self._pipeline: Optional[VoicePipeline] = None
+        self._pipeline: VoicePipeline | None = None
         self._is_active = False
-        self._audio_routing_task: Optional[asyncio.Task] = None
-        
+        self._audio_routing_task: asyncio.Task | None = None
+
         logger.info(
             "Twilio-Voice Bridge initialized (session: %s)",
             config.session_id
@@ -77,7 +77,7 @@ class TwilioVoiceBridge:
         return self._is_active
 
     @property
-    def pipeline(self) -> Optional[VoicePipeline]:
+    def pipeline(self) -> VoicePipeline | None:
         """Get active voice pipeline."""
         return self._pipeline
 
@@ -93,15 +93,15 @@ class TwilioVoiceBridge:
         if self._is_active:
             logger.warning("Bridge already active")
             return
-        
+
         logger.info("Starting Twilio-Voice Bridge")
-        
+
         # Register Twilio callbacks
         self._twilio.on_call_started(self._handle_call_started)
         self._twilio.on_call_ended(self._handle_call_ended)
         self._twilio.on_audio_received(self._handle_twilio_audio)
         self._twilio.on_error(self._handle_twilio_error)
-        
+
         self._is_active = True
         logger.info("Twilio-Voice Bridge started")
 
@@ -114,11 +114,11 @@ class TwilioVoiceBridge:
         if not self._is_active:
             logger.debug("Bridge already stopped")
             return
-        
+
         logger.info("Stopping Twilio-Voice Bridge")
-        
+
         self._is_active = False
-        
+
         # Cancel audio routing task
         if self._audio_routing_task and not self._audio_routing_task.done():
             self._audio_routing_task.cancel()
@@ -126,7 +126,7 @@ class TwilioVoiceBridge:
                 await self._audio_routing_task
             except asyncio.CancelledError:
                 pass
-        
+
         # Stop pipeline if active
         if self._pipeline:
             try:
@@ -134,7 +134,7 @@ class TwilioVoiceBridge:
                 self._pipeline = None
             except Exception as e:
                 logger.error("Error stopping pipeline: %s", str(e))
-        
+
         logger.info("Twilio-Voice Bridge stopped")
 
     def _handle_call_started(self, call_metadata: TwilioCallMetadata) -> None:
@@ -153,7 +153,7 @@ class TwilioVoiceBridge:
             call_metadata.call_sid,
             call_metadata.caller_id
         )
-        
+
         # Create orchestrator call metadata
         orchestrator_metadata = OrchestratorCallMetadata(
             caller_id=call_metadata.caller_id,
@@ -168,7 +168,7 @@ class TwilioVoiceBridge:
                 "custom_parameters": call_metadata.custom_parameters,
             },
         )
-        
+
         # Start session asynchronously
         asyncio.create_task(self._start_session(orchestrator_metadata))
 
@@ -186,13 +186,13 @@ class TwilioVoiceBridge:
                 caller_id=call_metadata.caller_id,
                 call_metadata=call_metadata,
             )
-            
+
             # Register pipeline callbacks for audio output
             self._pipeline.on_audio_generated(self._handle_pipeline_audio)
             self._pipeline.on_latency_metric(self._handle_latency_metrics)
-            
+
             logger.info("Voice pipeline session started: %s", self.config.session_id)
-            
+
         except Exception as e:
             logger.error("Failed to start session: %s", str(e))
             # Notify Twilio of error
@@ -215,7 +215,7 @@ class TwilioVoiceBridge:
             call_metadata.call_sid,
             call_metadata.duration_seconds
         )
-        
+
         # Stop session asynchronously
         asyncio.create_task(self._stop_session())
 
@@ -227,16 +227,16 @@ class TwilioVoiceBridge:
                     session_id=self.config.session_id,
                     persist=True,
                 )
-                
+
                 if summary:
                     logger.info(
                         "Session stopped: %s (turns: %d)",
                         self.config.session_id,
                         summary.get("turn_count", 0)
                     )
-                
+
                 self._pipeline = None
-            
+
         except Exception as e:
             logger.error("Error stopping session: %s", str(e))
 
@@ -254,10 +254,10 @@ class TwilioVoiceBridge:
         if not self._pipeline or not self._pipeline.is_active:
             logger.debug("Pipeline not active, dropping audio")
             return
-        
+
         if self.config.enable_audio_logging:
             logger.debug("Received audio from Twilio: %d bytes", len(audio_data))
-        
+
         # Route audio to pipeline asynchronously
         asyncio.create_task(self._route_audio_to_pipeline(audio_data))
 
@@ -288,10 +288,10 @@ class TwilioVoiceBridge:
         if not self._twilio.is_connected:
             logger.debug("Twilio not connected, dropping audio")
             return
-        
+
         if self.config.enable_audio_logging:
             logger.debug("Sending audio to Twilio: %d bytes", len(audio_data))
-        
+
         # Route audio to Twilio asynchronously
         asyncio.create_task(self._route_audio_to_twilio(audio_data))
 
@@ -331,7 +331,7 @@ class TwilioVoiceBridge:
             error: Exception from Twilio
         """
         logger.error("Twilio error: %s", str(error))
-        
+
         # Stop session on error
         asyncio.create_task(self._stop_session())
 
@@ -344,7 +344,7 @@ class TwilioVoiceBridge:
         """
         return self.config.session_id
 
-    def get_call_metadata(self) -> Optional[TwilioCallMetadata]:
+    def get_call_metadata(self) -> TwilioCallMetadata | None:
         """
         Get current call metadata from Twilio.
         
@@ -353,7 +353,7 @@ class TwilioVoiceBridge:
         """
         return self._twilio.get_call_metadata()
 
-    def get_pipeline_metrics(self) -> Optional[LatencyMetrics]:
+    def get_pipeline_metrics(self) -> LatencyMetrics | None:
         """
         Get current pipeline latency metrics.
         

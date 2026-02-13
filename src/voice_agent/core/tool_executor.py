@@ -6,12 +6,14 @@ parameter validation, and execution of external API calls.
 Requirements: 10.4, 10.5
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Protocol
-from datetime import datetime, timezone
 import logging
-from jsonschema import validate, ValidationError as JsonSchemaValidationError
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
 
+from jsonschema import ValidationError as JsonSchemaValidationError
+from jsonschema import validate
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +32,9 @@ class ToolDefinition:
     """
     name: str
     description: str
-    parameters_schema: Dict[str, Any]
-    handler: Callable[[Dict[str, Any]], Any]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    parameters_schema: dict[str, Any]
+    handler: Callable[[dict[str, Any]], Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -48,8 +50,8 @@ class ToolResult:
         timestamp: When the tool was executed (ISO format)
     """
     success: bool
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
     execution_time_ms: float = 0.0
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -63,12 +65,12 @@ class ToolExecutor:
     
     Requirements: 10.4, 10.5
     """
-    
+
     def __init__(self):
         """Initialize the ToolExecutor with an empty tool registry."""
-        self._tools: Dict[str, ToolDefinition] = {}
+        self._tools: dict[str, ToolDefinition] = {}
         logger.info("ToolExecutor initialized")
-    
+
     def register_tool(self, tool_def: ToolDefinition) -> None:
         """
         Register a new tool for execution.
@@ -81,15 +83,15 @@ class ToolExecutor:
         """
         if tool_def.name in self._tools:
             raise ValueError(f"Tool '{tool_def.name}' is already registered")
-        
+
         self._tools[tool_def.name] = tool_def
         logger.info(f"Registered tool: {tool_def.name}")
-    
+
     def validate_parameters(
-        self, 
-        tool_name: str, 
-        parameters: Dict[str, Any]
-    ) -> tuple[bool, Optional[str]]:
+        self,
+        tool_name: str,
+        parameters: dict[str, Any]
+    ) -> tuple[bool, str | None]:
         """
         Validate parameters against the tool's JSON schema.
         
@@ -105,9 +107,9 @@ class ToolExecutor:
         """
         if tool_name not in self._tools:
             raise ValueError(f"Tool '{tool_name}' is not registered")
-        
+
         tool_def = self._tools[tool_name]
-        
+
         try:
             validate(instance=parameters, schema=tool_def.parameters_schema)
             return True, None
@@ -115,12 +117,12 @@ class ToolExecutor:
             error_msg = f"Parameter validation failed: {e.message}"
             logger.warning(f"Validation failed for tool '{tool_name}': {error_msg}")
             return False, error_msg
-    
+
     def execute_tool(
-        self, 
-        tool_name: str, 
-        parameters: Dict[str, Any],
-        context: Optional[Dict[str, Any]] = None
+        self,
+        tool_name: str,
+        parameters: dict[str, Any],
+        context: dict[str, Any] | None = None
     ) -> ToolResult:
         """
         Execute a tool with the given parameters.
@@ -134,7 +136,7 @@ class ToolExecutor:
             ToolResult containing execution outcome
         """
         start_time = datetime.now(timezone.utc)
-        
+
         # Check if tool exists
         if tool_name not in self._tools:
             error_msg = f"Tool '{tool_name}' is not registered"
@@ -144,7 +146,7 @@ class ToolExecutor:
                 error=error_msg,
                 execution_time_ms=0.0
             )
-        
+
         # Validate parameters
         is_valid, validation_error = self.validate_parameters(tool_name, parameters)
         if not is_valid:
@@ -154,16 +156,16 @@ class ToolExecutor:
                 error=validation_error,
                 execution_time_ms=0.0
             )
-        
+
         # Execute the tool
         tool_def = self._tools[tool_name]
         try:
             logger.info(f"Executing tool '{tool_name}' with parameters: {parameters}")
             result_data = tool_def.handler(parameters)
-            
+
             end_time = datetime.now(timezone.utc)
             execution_time_ms = (end_time - start_time).total_seconds() * 1000
-            
+
             logger.info(f"Tool '{tool_name}' executed successfully in {execution_time_ms:.2f}ms")
             return ToolResult(
                 success=True,
@@ -173,16 +175,16 @@ class ToolExecutor:
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             execution_time_ms = (end_time - start_time).total_seconds() * 1000
-            
+
             error_msg = self.handle_tool_error(e, tool_name)
             logger.error(f"Tool '{tool_name}' execution failed: {error_msg}")
-            
+
             return ToolResult(
                 success=False,
                 error=error_msg,
                 execution_time_ms=execution_time_ms
             )
-    
+
     def handle_tool_error(self, error: Exception, tool_name: str) -> str:
         """
         Handle tool execution errors and return a user-friendly error message.
@@ -196,14 +198,14 @@ class ToolExecutor:
         """
         error_type = type(error).__name__
         error_msg = str(error)
-        
+
         # Log the full error for debugging
         logger.exception(f"Tool '{tool_name}' raised {error_type}: {error_msg}")
-        
+
         # Return a user-friendly error message
         return f"Tool execution failed: {error_type} - {error_msg}"
-    
-    def get_tool(self, tool_name: str) -> Optional[ToolDefinition]:
+
+    def get_tool(self, tool_name: str) -> ToolDefinition | None:
         """
         Get a tool definition by name.
         
@@ -214,7 +216,7 @@ class ToolExecutor:
             ToolDefinition if found, None otherwise
         """
         return self._tools.get(tool_name)
-    
+
     def list_tools(self) -> list[str]:
         """
         List all registered tool names.
@@ -223,7 +225,7 @@ class ToolExecutor:
             List of registered tool names
         """
         return list(self._tools.keys())
-    
+
     def unregister_tool(self, tool_name: str) -> bool:
         """
         Unregister a tool.

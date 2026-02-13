@@ -7,18 +7,18 @@ and fallback handling for local model unavailability.
 **Validates: Requirements 13.2, 13.5, 7.6**
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
-import json
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from src.voice_agent.services.ollama_llm_service import OllamaLLMService
+import pytest
+
 from src.voice_agent.services.llm_service import (
-    LLMConfig,
-    LLMResponse,
+    ConversationContext,
     Intent,
     IntentType,
-    ConversationContext,
+    LLMConfig,
+    LLMResponse,
 )
+from src.voice_agent.services.ollama_llm_service import OllamaLLMService
 
 
 def create_mock_response(status, json_data):
@@ -27,11 +27,11 @@ def create_mock_response(status, json_data):
     mock_response.status = status
     mock_response.json = AsyncMock(return_value=json_data)
     mock_response.text = AsyncMock(return_value=str(json_data))
-    
+
     mock_cm = MagicMock()
     mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
     mock_cm.__aexit__ = AsyncMock(return_value=None)
-    
+
     return mock_cm
 
 
@@ -78,7 +78,7 @@ class TestOllamaLLMServiceInitialization:
     def test_initialization_with_valid_config(self, ollama_config):
         """Test service initializes with valid configuration."""
         service = OllamaLLMService(config=ollama_config)
-        
+
         assert service.config.provider == "ollama"
         assert service.config.model == "llama2"
         assert service.base_url == "http://localhost:11434"
@@ -91,7 +91,7 @@ class TestOllamaLLMServiceInitialization:
             config=ollama_config,
             base_url="http://custom-host:8080/",
         )
-        
+
         assert service.base_url == "http://custom-host:8080"
 
     def test_initialization_with_gpu_disabled(self, ollama_config):
@@ -100,7 +100,7 @@ class TestOllamaLLMServiceInitialization:
             config=ollama_config,
             gpu_enabled=False,
         )
-        
+
         assert service.gpu_enabled is False
 
     def test_initialization_with_fallback_service(self, ollama_config):
@@ -110,13 +110,13 @@ class TestOllamaLLMServiceInitialization:
             config=ollama_config,
             fallback_service=fallback,
         )
-        
+
         assert service.fallback_service is fallback
 
     def test_initialization_rejects_wrong_provider(self):
         """Test service rejects non-ollama provider."""
         config = LLMConfig(provider="openai", model="gpt-4")
-        
+
         with pytest.raises(ValueError, match="requires provider='ollama'"):
             OllamaLLMService(config=config)
 
@@ -135,18 +135,18 @@ class TestModelAvailability:
                 {"name": "mistral:latest"},
             ]
         })
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.get = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             is_available = await ollama_service.check_model_availability()
-            
+
             assert is_available is True
             assert ollama_service._model_available is True
 
@@ -161,18 +161,18 @@ class TestModelAvailability:
                 {"name": "codellama:latest"},
             ]
         })
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.get = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             is_available = await ollama_service.check_model_availability()
-            
+
             assert is_available is False
             assert ollama_service._model_available is False
 
@@ -181,18 +181,18 @@ class TestModelAvailability:
         """Test model availability check with API error."""
         mock_response = Mock()
         mock_response.status = 500
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.get = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             is_available = await ollama_service.check_model_availability()
-            
+
             assert is_available is False
 
     @pytest.mark.asyncio
@@ -200,10 +200,10 @@ class TestModelAvailability:
         """Test model availability result is cached."""
         # Set cached result
         ollama_service._model_available = True
-        
+
         # Should return cached result without making API call
         is_available = await ollama_service.check_model_availability()
-        
+
         assert is_available is True
 
 
@@ -218,28 +218,28 @@ class TestGenerateResponse:
     ):
         """Test successful response generation."""
         transcript = "I need to schedule an appointment for tomorrow at 2pm"
-        
+
         # Mock model availability
         ollama_service._model_available = True
-        
+
         # Mock Ollama API response
         mock_response = Mock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={
             "response": "I'd be happy to help you schedule an appointment for tomorrow at 2pm. Let me check available slots for you.",
         })
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             assert isinstance(response, LLMResponse)
             assert len(response.text) > 0
             assert response.intent.name == IntentType.SCHEDULE_APPOINTMENT.value
@@ -257,22 +257,22 @@ class TestGenerateResponse:
         """Test response generation includes GPU configuration."""
         transcript = "Hello"
         ollama_service._model_available = True
-        
+
         mock_response = Mock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"response": "Hi there!"})
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             await ollama_service.generate_response(transcript, conversation_context)
-            
+
             # Check that GPU configuration was included
             call_args = mock_session.post.call_args
             payload = call_args[1]["json"]
@@ -286,7 +286,7 @@ class TestGenerateResponse:
     ):
         """Test response generation falls back when model unavailable."""
         transcript = "Hello"
-        
+
         # Create fallback service
         fallback = AsyncMock()
         fallback_response = LLMResponse(
@@ -295,17 +295,17 @@ class TestGenerateResponse:
             confidence=0.9,
         )
         fallback.generate_response = AsyncMock(return_value=fallback_response)
-        
+
         service = OllamaLLMService(
             config=ollama_config,
             fallback_service=fallback,
         )
-        
+
         # Mock model as unavailable
         service._model_available = False
-        
+
         response = await service.generate_response(transcript, conversation_context)
-        
+
         assert response.text == "Fallback response"
         fallback.generate_response.assert_called_once()
 
@@ -317,10 +317,10 @@ class TestGenerateResponse:
     ):
         """Test response generation fails when model unavailable and no fallback."""
         transcript = "Hello"
-        
+
         # Mock model as unavailable
         ollama_service._model_available = False
-        
+
         with pytest.raises(RuntimeError, match="not available and no fallback"):
             await ollama_service.generate_response(transcript, conversation_context)
 
@@ -332,7 +332,7 @@ class TestGenerateResponse:
     ):
         """Test response generation uses fallback on API error."""
         transcript = "Hello"
-        
+
         # Create fallback service
         fallback = AsyncMock()
         fallback_response = LLMResponse(
@@ -341,29 +341,29 @@ class TestGenerateResponse:
             confidence=0.9,
         )
         fallback.generate_response = AsyncMock(return_value=fallback_response)
-        
+
         service = OllamaLLMService(
             config=ollama_config,
             fallback_service=fallback,
         )
         service._model_available = True
-        
+
         # Mock API error
         mock_response = Mock()
         mock_response.status = 500
         mock_response.text = AsyncMock(return_value="Internal server error")
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(service, '_get_session', return_value=mock_session):
             response = await service.generate_response(transcript, conversation_context)
-            
+
             assert response.text == "Fallback response"
             fallback.generate_response.assert_called_once()
 
@@ -376,20 +376,20 @@ class TestGenerateResponse:
         """Test response generation fails on API error without fallback."""
         transcript = "Hello"
         ollama_service._model_available = True
-        
+
         # Mock API error
         mock_response = Mock()
         mock_response.status = 500
         mock_response.text = AsyncMock(return_value="Internal server error")
-        
+
         # Create proper async context manager mock
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_response)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
-        
+
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             with pytest.raises(RuntimeError, match="Failed to generate LLM response"):
                 await ollama_service.generate_response(transcript, conversation_context)
@@ -407,7 +407,7 @@ class TestVoiceOptimization:
         """Test that responses are optimized for voice output."""
         transcript = "Hello"
         ollama_service._model_available = True
-        
+
         # Response with markdown and long text
         raw_response = """**Hello!** I'm here to help you.
         
@@ -421,20 +421,20 @@ Here's a table:
 | Data     | More     |
 
 This is a very long response with many sentences. It goes on and on. And on. And on. And on. And on."""
-        
+
         mock_cm = create_mock_response(200, {"response": raw_response})
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             # Check voice optimization
             assert "**" not in response.text  # No markdown
             assert "*" not in response.text
             assert "|" not in response.text  # No tables
             assert "-" not in response.text or "- " not in response.text  # No bullet points
-            
+
             # Check sentence limit (should be 3 or fewer)
             sentences = [s.strip() for s in response.text.split(".") if s.strip()]
             assert len(sentences) <= 3
@@ -452,14 +452,14 @@ class TestIntentClassification:
         """Test classification of schedule appointment intent."""
         transcript = "I want to schedule an appointment for next Monday"
         ollama_service._model_available = True
-        
+
         mock_cm = create_mock_response(200, {"response": "Sure, I can help with that."})
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             assert response.intent.name == IntentType.SCHEDULE_APPOINTMENT.value
             assert response.intent.requires_tool is True
             assert response.intent.tool_name == "book_appointment"
@@ -473,14 +473,14 @@ class TestIntentClassification:
         """Test classification of cancel appointment intent."""
         transcript = "I need to cancel my appointment"
         ollama_service._model_available = True
-        
+
         mock_cm = create_mock_response(200, {"response": "I can help you cancel."})
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             assert response.intent.name == IntentType.CANCEL_APPOINTMENT.value
             assert response.intent.requires_tool is True
 
@@ -497,14 +497,14 @@ class TestParameterExtraction:
         """Test extraction of date and time parameters."""
         transcript = "Book an appointment for tomorrow at 2:30pm"
         ollama_service._model_available = True
-        
+
         mock_cm = create_mock_response(200, {"response": "I'll book that for you."})
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             # Check that date and time parameters were extracted
             assert "date" in response.parameters
             assert "time" in response.parameters
@@ -525,16 +525,16 @@ class TestEmotionalTags:
         """Test extraction of empathetic emotional tags."""
         transcript = "Hello"
         ollama_service._model_available = True
-        
+
         mock_cm = create_mock_response(200, {
             "response": "I'm sorry to hear that. I understand this must be frustrating."
         })
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             assert "empathetic" in response.emotional_tags
             assert "understanding" in response.emotional_tags
 
@@ -547,16 +547,16 @@ class TestEmotionalTags:
         """Test extraction of enthusiastic emotional tags."""
         transcript = "Hello"
         ollama_service._model_available = True
-        
+
         mock_cm = create_mock_response(200, {
             "response": "That's wonderful! I'm excited to help you with that."
         })
         mock_session = Mock()
         mock_session.post = Mock(return_value=mock_cm)
-        
+
         with patch.object(ollama_service, '_get_session', return_value=mock_session):
             response = await ollama_service.generate_response(transcript, conversation_context)
-            
+
             assert "enthusiastic" in response.emotional_tags
 
 
@@ -570,6 +570,6 @@ class TestContextManager:
             # Get session to create it
             await service._get_session()
             assert service._session is not None
-        
+
         # Session should be closed after context exit
         assert service._session is None or service._session.closed

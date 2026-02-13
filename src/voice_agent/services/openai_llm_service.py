@@ -8,24 +8,23 @@ and voice-optimized prompt engineering.
 **Validates: Requirements 13.1, 6.1, 6.2, 6.3**
 """
 
-import logging
 import json
-from typing import Optional, List, Dict, Any
+import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from openai import AsyncOpenAI, OpenAIError
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 
 from .llm_service import (
-    LLMService,
-    LLMConfig,
-    LLMResponse,
+    ConversationContext,
     Intent,
     IntentType,
+    LLMConfig,
+    LLMResponse,
+    LLMService,
     ToolCall,
-    ConversationContext,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class OpenAILLMService(LLMService):
     and voice-optimized prompt engineering for natural conversations.
     """
 
-    def __init__(self, config: LLMConfig, api_key: Optional[str] = None):
+    def __init__(self, config: LLMConfig, api_key: str | None = None):
         """
         Initialize OpenAI LLM service.
         
@@ -47,13 +46,13 @@ class OpenAILLMService(LLMService):
             api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
         """
         super().__init__(config)
-        
+
         if config.provider != "openai":
             raise ValueError(f"OpenAI service requires provider='openai', got '{config.provider}'")
-        
+
         self.client = AsyncOpenAI(api_key=api_key)
         self._function_definitions = self._create_function_definitions()
-        
+
         logger.info("OpenAI LLM service initialized with model: %s", config.model)
 
     async def generate_response(
@@ -80,7 +79,7 @@ class OpenAILLMService(LLMService):
         try:
             # Build messages with voice-optimized system prompt
             messages = self._build_messages(transcript, context)
-            
+
             # Call OpenAI with function calling support
             response = await self.client.chat.completions.create(
                 model=self.config.model,
@@ -94,10 +93,10 @@ class OpenAILLMService(LLMService):
                 presence_penalty=self.config.presence_penalty,
                 timeout=self.config.timeout,
             )
-            
+
             # Parse response
             return self._parse_response(response, transcript)
-            
+
         except OpenAIError as e:
             logger.error("OpenAI API error: %s", str(e))
             raise RuntimeError(f"Failed to generate LLM response: {str(e)}") from e
@@ -109,7 +108,7 @@ class OpenAILLMService(LLMService):
         self,
         transcript: str,
         context: ConversationContext,
-    ) -> List[ChatCompletionMessageParam]:
+    ) -> list[ChatCompletionMessageParam]:
         """
         Build message list for OpenAI API with voice-optimized prompts.
         
@@ -120,15 +119,15 @@ class OpenAILLMService(LLMService):
         Returns:
             List of messages for OpenAI API
         """
-        messages: List[ChatCompletionMessageParam] = []
-        
+        messages: list[ChatCompletionMessageParam] = []
+
         # System prompt with voice optimization instructions
         system_prompt = self._build_voice_optimized_system_prompt()
         messages.append({
             "role": "system",
             "content": system_prompt,
         })
-        
+
         # Add conversation history
         for turn in context.conversation_history[-5:]:  # Last 5 turns for context
             role = turn.get("role", "user")
@@ -138,13 +137,13 @@ class OpenAILLMService(LLMService):
                     "role": role,
                     "content": content,
                 })
-        
+
         # Add current user message
         messages.append({
             "role": "user",
             "content": transcript,
         })
-        
+
         return messages
 
     def _build_voice_optimized_system_prompt(self) -> str:
@@ -161,7 +160,7 @@ class OpenAILLMService(LLMService):
             Voice-optimized system prompt
         """
         base_prompt = self.config.system_prompt or "You are a helpful voice assistant."
-        
+
         voice_instructions = """
 
 CRITICAL VOICE RESPONSE RULES:
@@ -177,10 +176,10 @@ CRITICAL VOICE RESPONSE RULES:
 10. Avoid technical jargon unless specifically requested
 
 Remember: Your responses will be spoken aloud by a text-to-speech system. Write as you would speak naturally in a conversation."""
-        
+
         return base_prompt + voice_instructions
 
-    def _create_function_definitions(self) -> List[Dict[str, Any]]:
+    def _create_function_definitions(self) -> list[dict[str, Any]]:
         """
         Create OpenAI function definitions for tool execution.
         
@@ -301,13 +300,13 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         """
         choice = response.choices[0]
         message = choice.message
-        
+
         # Check for function call
         function_call = message.function_call
         tool_call = None
         intent_name = IntentType.GENERAL_INQUIRY.value
         parameters = {}
-        
+
         if function_call:
             # Parse function call
             tool_name = str(function_call.name)
@@ -316,30 +315,30 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             except json.JSONDecodeError:
                 logger.warning("Failed to parse function arguments: %s", function_call.arguments)
                 tool_params = {}
-            
+
             # Map function name to intent
             intent_name = self._map_function_to_intent(tool_name)
             parameters = tool_params
-            
+
             # Create tool call
             tool_call = ToolCall(
                 tool_name=tool_name,
                 parameters=tool_params,
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
-            
+
             logger.info("Function call detected: %s with params: %s", tool_name, tool_params)
-        
+
         # Get response text
         response_text = message.content or ""
-        
+
         # If we have a function call but no response text, generate a default response
         if function_call and not response_text:
             response_text = self._generate_default_response(tool_call.tool_name, parameters)
-        
+
         # Apply voice optimization
         formatted_text = self.format_for_voice(response_text)
-        
+
         # Create intent
         intent = Intent(
             name=intent_name,
@@ -348,10 +347,10 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             requires_tool=tool_call is not None,
             tool_name=tool_call.tool_name if tool_call else None,
         )
-        
+
         # Extract emotional tags (if any)
         emotional_tags = self._extract_emotional_tags(response_text)
-        
+
         return LLMResponse(
             text=formatted_text,
             intent=intent,
@@ -388,7 +387,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         }
         return mapping.get(function_name, IntentType.GENERAL_INQUIRY.value)
 
-    def _generate_default_response(self, tool_name: str, parameters: Dict[str, Any]) -> str:
+    def _generate_default_response(self, tool_name: str, parameters: dict[str, Any]) -> str:
         """
         Generate default response when function call has no accompanying text.
         
@@ -415,7 +414,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         else:
             return "I'll help you with that."
 
-    def _extract_emotional_tags(self, text: str) -> List[str]:
+    def _extract_emotional_tags(self, text: str) -> list[str]:
         """
         Extract emotional tags for TTS from response text.
         
@@ -430,7 +429,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         """
         tags = []
         text_lower = text.lower()
-        
+
         # Detect emotional context
         if any(word in text_lower for word in ["sorry", "apologize", "unfortunately"]):
             tags.append("empathetic")
@@ -440,5 +439,5 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             tags.append("understanding")
         if "?" in text:
             tags.append("questioning")
-        
+
         return tags

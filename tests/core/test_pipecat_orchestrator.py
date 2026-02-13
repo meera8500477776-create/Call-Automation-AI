@@ -7,20 +7,14 @@ and manage session lifecycle.
 **Validates: Requirements 1.3, 1.4, 11.5**
 """
 
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, Mock, patch
 
-from src.voice_agent.core.pipecat_orchestrator import (
-    PipecatOrchestrator,
-    CallMetadata,
-)
+import pytest
+
 from src.voice_agent.config.registry import TenantRegistry
-from src.voice_agent.config.schema import (
-    TenantConfig,
-    PersonaConfig,
-    LLMConfig,
-    TTSConfig,
+from src.voice_agent.core.pipecat_orchestrator import (
+    CallMetadata,
+    PipecatOrchestrator,
 )
 from src.voice_agent.core.session_manager import SessionManager
 from src.voice_agent.core.voice_pipeline import VoicePipeline
@@ -118,7 +112,7 @@ class TestPipecatOrchestrator:
     def test_initialization(self, mock_tenant_registry):
         """Test orchestrator initialization."""
         orchestrator = PipecatOrchestrator(tenant_registry=mock_tenant_registry)
-        
+
         assert orchestrator._tenant_registry == mock_tenant_registry
         assert orchestrator._session_manager is not None
         assert orchestrator._llm_factory is not None
@@ -132,7 +126,7 @@ class TestPipecatOrchestrator:
             tenant_registry=mock_tenant_registry,
             session_manager=mock_session_manager,
         )
-        
+
         assert orchestrator._session_manager == mock_session_manager
 
     def test_route_call_success(
@@ -143,7 +137,7 @@ class TestPipecatOrchestrator:
             caller_id=call_metadata.caller_id,
             call_metadata=call_metadata,
         )
-        
+
         assert tenant_config == mock_tenant_config
         orchestrator._tenant_registry.get_tenant_by_caller.assert_called_once_with(
             call_metadata.caller_id
@@ -157,7 +151,7 @@ class TestPipecatOrchestrator:
         orchestrator._tenant_registry.get_tenant_by_caller.side_effect = KeyError(
             "No tenant mapping found"
         )
-        
+
         with pytest.raises(KeyError, match="No tenant mapping found"):
             orchestrator.route_call(
                 caller_id=call_metadata.caller_id,
@@ -169,33 +163,39 @@ class TestPipecatOrchestrator:
         orchestrator._tenant_registry.load_tenant_config.side_effect = FileNotFoundError(
             "Configuration file not found"
         )
-        
+
         with pytest.raises(FileNotFoundError, match="Configuration file not found"):
             orchestrator.route_call(
                 caller_id=call_metadata.caller_id,
                 call_metadata=call_metadata,
             )
 
+    @pytest.mark.asyncio
     @patch('src.voice_agent.core.pipecat_orchestrator.VoicePipeline')
-    def test_initialize_pipeline(
+    async def test_initialize_pipeline(
         self, mock_pipeline_class, orchestrator, mock_tenant_config
     ):
         """Test pipeline initialization from tenant configuration."""
         mock_pipeline = Mock(spec=VoicePipeline)
         mock_pipeline_class.return_value = mock_pipeline
-        
-        pipeline = orchestrator.initialize_pipeline(
-            session_id="test_session",
-            tenant_config=mock_tenant_config,
-        )
-        
+
+        # Mock LLM service creation
+        with patch.object(orchestrator._llm_factory, 'create_llm_service', new_callable=AsyncMock) as mock_llm:
+            mock_llm_service = Mock()
+            mock_llm.return_value = mock_llm_service
+
+            pipeline = await orchestrator.initialize_pipeline(
+                session_id="test_session",
+                tenant_config=mock_tenant_config,
+            )
+
         assert pipeline == mock_pipeline
         mock_pipeline_class.assert_called_once()
-        
+
         # Verify pipeline config was created with correct parameters
         call_args = mock_pipeline_class.call_args
         pipeline_config = call_args[0][0]
-        
+
         assert pipeline_config.session_id == "test_session"
         assert pipeline_config.llm_service is not None
         assert pipeline_config.stt_config is not None
@@ -211,25 +211,25 @@ class TestPipecatOrchestrator:
         mock_pipeline = AsyncMock(spec=VoicePipeline)
         mock_pipeline.initialize = AsyncMock()
         mock_pipeline_class.return_value = mock_pipeline
-        
+
         pipeline = await orchestrator.start_session(
             session_id="test_session",
             caller_id=call_metadata.caller_id,
             call_metadata=call_metadata,
         )
-        
+
         assert pipeline == mock_pipeline
-        
+
         # Verify session was created
         orchestrator._session_manager.create_session.assert_called_once()
         create_call = orchestrator._session_manager.create_session.call_args
         assert create_call[1]["tenant_id"] == "test_tenant"
         assert create_call[1]["caller_id"] == call_metadata.caller_id
         assert create_call[1]["session_id"] == "test_session"
-        
+
         # Verify pipeline was initialized
         mock_pipeline.initialize.assert_called_once()
-        
+
         # Verify pipeline was stored
         assert "test_session" in orchestrator._active_pipelines
         assert orchestrator._active_pipelines["test_session"] == mock_pipeline
@@ -243,14 +243,14 @@ class TestPipecatOrchestrator:
         mock_pipeline = AsyncMock(spec=VoicePipeline)
         mock_pipeline.initialize = AsyncMock(side_effect=RuntimeError("Init failed"))
         mock_pipeline_class.return_value = mock_pipeline
-        
+
         with pytest.raises(RuntimeError, match="Init failed"):
             await orchestrator.start_session(
                 session_id="test_session",
                 caller_id=call_metadata.caller_id,
                 call_metadata=call_metadata,
             )
-        
+
         # Verify session was deleted on failure
         orchestrator._session_manager.delete_session.assert_called_once_with("test_session")
 
@@ -261,20 +261,20 @@ class TestPipecatOrchestrator:
         mock_pipeline = AsyncMock(spec=VoicePipeline)
         mock_pipeline.shutdown = AsyncMock()
         orchestrator._active_pipelines["test_session"] = mock_pipeline
-        
+
         summary = await orchestrator.stop_session("test_session", persist=True)
-        
+
         # Verify pipeline was shutdown
         mock_pipeline.shutdown.assert_called_once()
-        
+
         # Verify session was cleaned up
         orchestrator._session_manager.cleanup_session.assert_called_once_with(
             "test_session", persist=True
         )
-        
+
         # Verify pipeline was removed
         assert "test_session" not in orchestrator._active_pipelines
-        
+
         # Verify summary was returned
         assert summary["session_id"] == "test_session"
         assert summary["duration_seconds"] == 120.5
@@ -283,7 +283,7 @@ class TestPipecatOrchestrator:
     async def test_stop_session_no_pipeline(self, orchestrator):
         """Test stopping session with no active pipeline."""
         summary = await orchestrator.stop_session("nonexistent_session")
-        
+
         # Should still cleanup session
         orchestrator._session_manager.cleanup_session.assert_called_once_with(
             "nonexistent_session", persist=True
@@ -295,13 +295,13 @@ class TestPipecatOrchestrator:
         mock_pipeline = AsyncMock(spec=VoicePipeline)
         mock_pipeline.shutdown = AsyncMock(side_effect=RuntimeError("Shutdown failed"))
         orchestrator._active_pipelines["test_session"] = mock_pipeline
-        
+
         # Should not raise, but log error
         summary = await orchestrator.stop_session("test_session")
-        
+
         # Verify pipeline was still removed
         assert "test_session" not in orchestrator._active_pipelines
-        
+
         # Verify session was still cleaned up
         orchestrator._session_manager.cleanup_session.assert_called_once()
 
@@ -309,10 +309,10 @@ class TestPipecatOrchestrator:
         """Test retrieving active pipeline."""
         mock_pipeline = Mock(spec=VoicePipeline)
         orchestrator._active_pipelines["test_session"] = mock_pipeline
-        
+
         pipeline = orchestrator.get_active_pipeline("test_session")
         assert pipeline == mock_pipeline
-        
+
         # Test nonexistent session
         pipeline = orchestrator.get_active_pipeline("nonexistent")
         assert pipeline is None
@@ -322,9 +322,9 @@ class TestPipecatOrchestrator:
         orchestrator._active_pipelines["session1"] = Mock()
         orchestrator._active_pipelines["session2"] = Mock()
         orchestrator._active_pipelines["session3"] = Mock()
-        
+
         session_ids = orchestrator.get_active_session_ids()
-        
+
         assert len(session_ids) == 3
         assert "session1" in session_ids
         assert "session2" in session_ids
@@ -333,10 +333,10 @@ class TestPipecatOrchestrator:
     def test_get_session_count(self, orchestrator):
         """Test getting active session count."""
         assert orchestrator.get_session_count() == 0
-        
+
         orchestrator._active_pipelines["session1"] = Mock()
         assert orchestrator.get_session_count() == 1
-        
+
         orchestrator._active_pipelines["session2"] = Mock()
         orchestrator._active_pipelines["session3"] = Mock()
         assert orchestrator.get_session_count() == 3
@@ -344,17 +344,23 @@ class TestPipecatOrchestrator:
     def test_build_stt_config(self, orchestrator, mock_tenant_config):
         """Test STT configuration building."""
         stt_config = orchestrator._build_stt_config(mock_tenant_config)
-        
+
         assert stt_config.model == "nova-2"
         assert stt_config.language == "en-US"
-        assert stt_config.enable_interim_results is True
-        assert stt_config.enable_punctuation is True
+        assert stt_config.interim_results is True
+        assert stt_config.punctuate is True
 
     def test_build_vad_config(self, orchestrator, mock_tenant_config):
         """Test VAD configuration building."""
+        # Add vad config to mock
+        mock_tenant_config.vad = Mock()
+        mock_tenant_config.vad.threshold = 0.5
+        mock_tenant_config.vad.min_speech_duration_ms = 250
+        mock_tenant_config.vad.min_silence_duration_ms = 500
+
         vad_config = orchestrator._build_vad_config(mock_tenant_config)
-        
-        # Should use defaults when not specified
+
+        # Should use values from config
         assert vad_config.threshold == 0.5
         assert vad_config.min_speech_duration_ms == 250
         assert vad_config.min_silence_duration_ms == 500
@@ -362,7 +368,7 @@ class TestPipecatOrchestrator:
     def test_build_voice_config(self, orchestrator, mock_tenant_config):
         """Test voice configuration building."""
         voice_config = orchestrator._build_voice_config(mock_tenant_config)
-        
+
         assert voice_config.provider == "elevenlabs"
         assert voice_config.voice_id == "test_voice_123"
         assert voice_config.stability == 0.5

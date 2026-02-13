@@ -5,15 +5,14 @@ Tests WebSocket connection management, audio streaming, callback handlers,
 and error handling for the Deepgram STT service wrapper.
 """
 
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from typing import List, Tuple
 
 from src.voice_agent.services.stt_service import (
-    STTService,
-    STTConfig,
     ConnectionState,
+    STTConfig,
+    STTService,
 )
 
 
@@ -46,7 +45,7 @@ class TestSTTServiceInitialization:
     def test_initialization_with_config(self, stt_config):
         """Test service initializes with provided configuration."""
         service = STTService(stt_config)
-        
+
         assert service.config == stt_config
         assert service.state == ConnectionState.DISCONNECTED
         assert not service.is_connected
@@ -55,7 +54,7 @@ class TestSTTServiceInitialization:
     def test_default_config_values(self):
         """Test default configuration values are applied."""
         config = STTConfig(api_key="test_key")
-        
+
         assert config.model == "nova-2"
         assert config.language == "en-US"
         assert config.interim_results is True
@@ -70,21 +69,21 @@ class TestCallbackRegistration:
         """Test registering interim result callback."""
         callback = Mock()
         stt_service.on_interim_result(callback)
-        
+
         assert stt_service._interim_callback == callback
 
     def test_register_final_callback(self, stt_service):
         """Test registering final result callback."""
         callback = Mock()
         stt_service.on_final_result(callback)
-        
+
         assert stt_service._final_callback == callback
 
     def test_register_error_callback(self, stt_service):
         """Test registering error callback."""
         callback = Mock()
         stt_service.on_error(callback)
-        
+
         assert stt_service._error_callback == callback
 
     def test_multiple_callback_registrations(self, stt_service):
@@ -92,11 +91,11 @@ class TestCallbackRegistration:
         interim_cb = Mock()
         final_cb = Mock()
         error_cb = Mock()
-        
+
         stt_service.on_interim_result(interim_cb)
         stt_service.on_final_result(final_cb)
         stt_service.on_error(error_cb)
-        
+
         assert stt_service._interim_callback == interim_cb
         assert stt_service._final_callback == final_cb
         assert stt_service._error_callback == error_cb
@@ -115,26 +114,26 @@ class TestConnectionManagement:
             mock_connection.__aexit__ = AsyncMock()
             mock_connection.start_listening = AsyncMock()
             mock_connection.on = Mock()
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Connect
             await stt_service.connect("test_session_123")
-            
+
             # Verify state
             assert stt_service.state == ConnectionState.CONNECTED
             assert stt_service.is_connected
             assert stt_service._session_id == "test_session_123"
-            
+
             # Verify connection was started
             mock_connection.start_listening.assert_called_once()
 
@@ -144,37 +143,37 @@ class TestConnectionManagement:
         with patch('src.voice_agent.services.stt_service.AsyncDeepgramClient') as mock_client_class:
             # Setup mock to fail then succeed
             call_count = 0
-            
+
             async def mock_aenter_side_effect():
                 nonlocal call_count
                 call_count += 1
                 if call_count == 1:
                     raise Exception("Connection failed")
                 return mock_connection
-            
+
             mock_connection = AsyncMock()
             mock_connection.__aenter__ = AsyncMock(side_effect=mock_aenter_side_effect)
             mock_connection.__aexit__ = AsyncMock()
             mock_connection.start_listening = AsyncMock()
             mock_connection.on = Mock()
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Reduce retry delay for testing
             stt_service._reconnect_delay = 0.01
-            
+
             # Connect should succeed after retry
             await stt_service.connect("test_session")
-            
+
             assert stt_service.is_connected
 
     @pytest.mark.asyncio
@@ -184,26 +183,26 @@ class TestConnectionManagement:
             # Setup mock to always fail
             mock_connection = AsyncMock()
             mock_connection.__aenter__ = AsyncMock(side_effect=Exception("Connection failed"))
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Reduce retry delay for testing
             stt_service._reconnect_delay = 0.01
             stt_service._max_reconnect_attempts = 2
-            
+
             # Connect should fail after max retries
             with pytest.raises(ConnectionError, match="Failed to connect after"):
                 await stt_service.connect("test_session")
-            
+
             assert stt_service.state == ConnectionState.ERROR
 
     @pytest.mark.asyncio
@@ -216,27 +215,27 @@ class TestConnectionManagement:
             mock_connection.__aexit__ = AsyncMock()
             mock_connection.start_listening = AsyncMock()
             mock_connection.on = Mock()
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Connect then disconnect
             await stt_service.connect("test_session")
             await stt_service.disconnect()
-            
+
             # Verify state
             assert stt_service.state == ConnectionState.DISCONNECTED
             assert not stt_service.is_connected
             assert stt_service._session_id is None
-            
+
             # Verify cleanup
             mock_connection.__aexit__.assert_called_once()
 
@@ -244,7 +243,7 @@ class TestConnectionManagement:
     async def test_disconnect_when_not_connected(self, stt_service):
         """Test disconnecting when not connected is safe."""
         await stt_service.disconnect()
-        
+
         assert stt_service.state == ConnectionState.DISCONNECTED
         assert not stt_service.is_connected
 
@@ -262,25 +261,25 @@ class TestAudioStreaming:
             mock_connection.start_listening = AsyncMock()
             mock_connection.send = Mock()
             mock_connection.on = Mock()
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Connect
             await stt_service.connect("test_session")
-            
+
             # Send audio
             audio_data = b"fake_audio_data"
             await stt_service.send_audio(audio_data)
-            
+
             # Verify audio was sent
             mock_connection.send.assert_called_once_with(audio_data)
 
@@ -288,7 +287,7 @@ class TestAudioStreaming:
     async def test_send_audio_not_connected(self, stt_service):
         """Test sending audio when not connected raises error."""
         audio_data = b"fake_audio_data"
-        
+
         with pytest.raises(RuntimeError, match="Not connected"):
             await stt_service.send_audio(audio_data)
 
@@ -301,21 +300,21 @@ class TestAudioStreaming:
             mock_connection.__aenter__ = AsyncMock(return_value=mock_connection)
             mock_connection.start_listening = AsyncMock()
             mock_connection.on = Mock()
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Connect
             await stt_service.connect("test_session")
-            
+
             # Send empty audio
             with pytest.raises(ValueError, match="cannot be empty"):
                 await stt_service.send_audio(b"")
@@ -330,17 +329,17 @@ class TestMessageHandling:
         interim_results = []
         def interim_callback(transcript, metadata):
             interim_results.append((transcript, metadata))
-        
+
         stt_service.on_interim_result(interim_callback)
-        
+
         # Create mock message
         mock_alternative = Mock()
         mock_alternative.transcript = "Hello world"
         mock_alternative.confidence = 0.85
-        
+
         mock_channel = Mock()
         mock_channel.alternatives = [mock_alternative]
-        
+
         mock_message = Mock()
         mock_message.type = "Results"
         mock_message.channel = mock_channel
@@ -348,10 +347,10 @@ class TestMessageHandling:
         mock_message.speech_final = False
         mock_message.duration = 1.5
         mock_message.start = 0.0
-        
+
         # Invoke handler
         stt_service._on_message(mock_message)
-        
+
         # Verify callback was invoked
         assert len(interim_results) == 1
         transcript, metadata = interim_results[0]
@@ -365,17 +364,17 @@ class TestMessageHandling:
         final_results = []
         def final_callback(transcript, metadata):
             final_results.append((transcript, metadata))
-        
+
         stt_service.on_final_result(final_callback)
-        
+
         # Create mock message
         mock_alternative = Mock()
         mock_alternative.transcript = "Complete sentence."
         mock_alternative.confidence = 0.95
-        
+
         mock_channel = Mock()
         mock_channel.alternatives = [mock_alternative]
-        
+
         mock_message = Mock()
         mock_message.type = "Results"
         mock_message.channel = mock_channel
@@ -383,10 +382,10 @@ class TestMessageHandling:
         mock_message.speech_final = True
         mock_message.duration = 2.0
         mock_message.start = 0.0
-        
+
         # Invoke handler
         stt_service._on_message(mock_message)
-        
+
         # Verify callback was invoked
         assert len(final_results) == 1
         transcript, metadata = final_results[0]
@@ -399,22 +398,22 @@ class TestMessageHandling:
         # Register callback
         callback = Mock()
         stt_service.on_final_result(callback)
-        
+
         # Create mock message with empty transcript
         mock_alternative = Mock()
         mock_alternative.transcript = ""
-        
+
         mock_channel = Mock()
         mock_channel.alternatives = [mock_alternative]
-        
+
         mock_message = Mock()
         mock_message.type = "Results"
         mock_message.channel = mock_channel
         mock_message.is_final = True
-        
+
         # Invoke handler
         stt_service._on_message(mock_message)
-        
+
         # Verify callback was not invoked
         callback.assert_not_called()
 
@@ -427,11 +426,11 @@ class TestErrorHandling:
         # Register callback
         error_callback = Mock()
         stt_service.on_error(error_callback)
-        
+
         # Trigger error
         error_msg = "Connection timeout"
         stt_service._on_error(error_msg)
-        
+
         # Verify callback was invoked
         error_callback.assert_called_once()
         assert stt_service.state == ConnectionState.ERROR
@@ -440,10 +439,10 @@ class TestErrorHandling:
         """Test close event updates connection state."""
         # Set initial state
         stt_service._state = ConnectionState.CONNECTED
-        
+
         # Trigger close
         stt_service._on_close()
-        
+
         # Verify state updated
         assert stt_service.state == ConnectionState.DISCONNECTED
 
@@ -457,30 +456,30 @@ class TestErrorHandling:
             mock_connection.start_listening = AsyncMock()
             mock_connection.send = Mock(side_effect=Exception("Network error"))
             mock_connection.on = Mock()
-            
+
             mock_connect = Mock(return_value=mock_connection)
             mock_v2 = Mock()
             mock_v2.connect = mock_connect
-            
+
             mock_listen = Mock()
             mock_listen.v2 = mock_v2
-            
+
             mock_client = Mock()
             mock_client.listen = mock_listen
             mock_client_class.return_value = mock_client
-            
+
             # Register error callback
             error_callback = Mock()
             stt_service.on_error(error_callback)
-            
+
             # Connect
             await stt_service.connect("test_session")
-            
+
             # Send audio should fail
             audio_data = b"fake_audio_data"
             with pytest.raises(Exception, match="Network error"):
                 await stt_service.send_audio(audio_data)
-            
+
             # Verify error callback was invoked
             error_callback.assert_called_once()
             assert stt_service.state == ConnectionState.ERROR
@@ -498,17 +497,17 @@ class TestDegradedAudioHandling:
         final_results = []
         def final_callback(transcript, metadata):
             final_results.append((transcript, metadata))
-        
+
         stt_service.on_final_result(final_callback)
-        
+
         # Create mock message with low confidence (degraded audio)
         mock_alternative = Mock()
         mock_alternative.transcript = "unclear speech"
         mock_alternative.confidence = 0.35  # Low confidence
-        
+
         mock_channel = Mock()
         mock_channel.alternatives = [mock_alternative]
-        
+
         mock_message = Mock()
         mock_message.type = "Results"
         mock_message.channel = mock_channel
@@ -516,10 +515,10 @@ class TestDegradedAudioHandling:
         mock_message.speech_final = True
         mock_message.duration = 1.0
         mock_message.start = 0.0
-        
+
         # Invoke handler
         stt_service._on_message(mock_message)
-        
+
         # Verify callback was invoked with low confidence metadata
         assert len(final_results) == 1
         transcript, metadata = final_results[0]
@@ -533,21 +532,21 @@ class TestDegradedAudioHandling:
         interim_results = []
         def interim_callback(transcript, metadata):
             interim_results.append((transcript, metadata))
-        
+
         stt_service.on_interim_result(interim_callback)
-        
+
         # Simulate multiple interim results with degraded audio
         confidence_levels = [0.25, 0.40, 0.55, 0.70]
         transcripts = ["uh", "uh hello", "hello there", "hello there friend"]
-        
+
         for confidence, transcript_text in zip(confidence_levels, transcripts):
             mock_alternative = Mock()
             mock_alternative.transcript = transcript_text
             mock_alternative.confidence = confidence
-            
+
             mock_channel = Mock()
             mock_channel.alternatives = [mock_alternative]
-            
+
             mock_message = Mock()
             mock_message.type = "Results"
             mock_message.channel = mock_channel
@@ -555,12 +554,12 @@ class TestDegradedAudioHandling:
             mock_message.speech_final = False
             mock_message.duration = 0.5
             mock_message.start = 0.0
-            
+
             stt_service._on_message(mock_message)
-        
+
         # Verify all interim results were processed
         assert len(interim_results) == 4
-        
+
         # Verify confidence improves as audio quality improves
         for i, (transcript, metadata) in enumerate(interim_results):
             assert metadata["confidence"] == confidence_levels[i]
@@ -571,19 +570,19 @@ class TestDegradedAudioHandling:
         # Register callbacks
         error_callback = Mock()
         final_callback = Mock()
-        
+
         stt_service.on_error(error_callback)
         stt_service.on_final_result(final_callback)
-        
+
         # Create malformed message (missing required attributes)
         mock_message = Mock()
         mock_message.type = "Results"
         # Intentionally missing channel attribute
         del mock_message.channel
-        
+
         # Invoke handler - should handle gracefully
         stt_service._on_message(mock_message)
-        
+
         # Verify final callback was not invoked
         final_callback.assert_not_called()
 
@@ -592,19 +591,19 @@ class TestDegradedAudioHandling:
         # Register callback
         final_callback = Mock()
         stt_service.on_final_result(final_callback)
-        
+
         # Create message with no alternatives
         mock_channel = Mock()
         mock_channel.alternatives = []
-        
+
         mock_message = Mock()
         mock_message.type = "Results"
         mock_message.channel = mock_channel
         mock_message.is_final = True
-        
+
         # Invoke handler
         stt_service._on_message(mock_message)
-        
+
         # Verify callback was not invoked (no transcript to process)
         final_callback.assert_not_called()
 
@@ -613,15 +612,15 @@ class TestDegradedAudioHandling:
         # Register callback
         final_callback = Mock()
         stt_service.on_final_result(final_callback)
-        
+
         # Create message with whitespace-only transcript
         mock_alternative = Mock()
         mock_alternative.transcript = "   "
         mock_alternative.confidence = 0.10
-        
+
         mock_channel = Mock()
         mock_channel.alternatives = [mock_alternative]
-        
+
         mock_message = Mock()
         mock_message.type = "Results"
         mock_message.channel = mock_channel
@@ -629,9 +628,9 @@ class TestDegradedAudioHandling:
         mock_message.speech_final = True
         mock_message.duration = 0.5
         mock_message.start = 0.0
-        
+
         # Invoke handler
         stt_service._on_message(mock_message)
-        
+
         # Verify callback was not invoked (empty transcript)
         final_callback.assert_not_called()

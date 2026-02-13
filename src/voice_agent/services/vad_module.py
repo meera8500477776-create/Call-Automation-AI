@@ -6,12 +6,12 @@ detection, turn-taking, and barge-in capability in voice conversations.
 """
 
 import logging
-import torch
-import numpy as np
-from typing import Callable, Optional, List
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
+import numpy as np
+import torch
 
 logger = logging.getLogger(__name__)
 
@@ -75,20 +75,20 @@ class VADModule:
         self.config = config
         self._state = SpeechState.SILENCE
         self._current_timestamp = 0.0
-        
+
         # Callback handlers
-        self._speech_start_callback: Optional[Callable[[float], None]] = None
-        self._speech_end_callback: Optional[Callable[[float], None]] = None
-        
+        self._speech_start_callback: Callable[[float], None] | None = None
+        self._speech_end_callback: Callable[[float], None] | None = None
+
         # Speech/silence duration tracking
         self._speech_frames = 0
         self._silence_frames = 0
-        self._speech_start_time: Optional[float] = None
-        
+        self._speech_start_time: float | None = None
+
         # Load Silero VAD model
         self._model = None
         self._load_model()
-        
+
         logger.info(
             "VAD module initialized (sample_rate: %d, threshold: %.2f)",
             config.sample_rate,
@@ -110,12 +110,12 @@ class VADModule:
                 force_reload=False,
                 onnx=False,
             )
-            
+
             # Set model to evaluation mode
             self._model.eval()
-            
+
             logger.info("Silero VAD model loaded successfully")
-            
+
         except Exception as e:
             logger.error("Failed to load Silero VAD model: %s", str(e))
             raise RuntimeError(f"Failed to load Silero VAD model: {e}") from e
@@ -154,7 +154,7 @@ class VADModule:
         """
         if not 0.0 <= threshold <= 1.0:
             raise ValueError(f"Threshold must be between 0.0 and 1.0, got {threshold}")
-        
+
         self.config.threshold = threshold
         logger.info("VAD sensitivity updated: threshold=%.2f", threshold)
 
@@ -174,50 +174,50 @@ class VADModule:
         """
         if not audio_chunk:
             raise ValueError("Audio chunk cannot be empty")
-        
+
         if self._model is None:
             raise RuntimeError("VAD model not loaded")
-        
+
         try:
             # Convert bytes to numpy array (16-bit PCM)
             audio_int16 = np.frombuffer(audio_chunk, dtype=np.int16)
-            
+
             # Convert to float32 normalized to [-1, 1]
             audio_float32 = audio_int16.astype(np.float32) / 32768.0
-            
+
             # Convert to torch tensor
             audio_tensor = torch.from_numpy(audio_float32)
-            
+
             # Get speech probability from model
             with torch.no_grad():
                 speech_prob = self._model(audio_tensor, self.config.sample_rate).item()
-            
+
             # Determine if speech is detected
             is_speech = speech_prob >= self.config.threshold
-            
+
             # Update timestamp
             chunk_duration = len(audio_int16) / self.config.sample_rate
             self._current_timestamp += chunk_duration
-            
+
             # Create result
             result = VADResult(
                 is_speech=is_speech,
                 confidence=speech_prob,
                 timestamp=self._current_timestamp,
             )
-            
+
             # Update state and trigger callbacks
             self._update_state(result)
-            
+
             logger.debug(
                 "VAD processed: is_speech=%s, confidence=%.3f, timestamp=%.3f",
                 is_speech,
                 speech_prob,
                 self._current_timestamp,
             )
-            
+
             return result
-            
+
         except Exception as e:
             logger.error("Error processing audio chunk: %s", str(e))
             raise
@@ -231,11 +231,11 @@ class VADModule:
         """
         # Calculate actual chunk duration in milliseconds
         # We track based on actual audio processed, not fixed window sizes
-        
+
         if result.is_speech:
             self._speech_frames += 1
             self._silence_frames = 0
-            
+
             # Transition from silence to speech
             if self._state == SpeechState.SILENCE:
                 # Check if we've accumulated enough speech
@@ -244,31 +244,31 @@ class VADModule:
                 if self._speech_frames >= 1:
                     self._state = SpeechState.SPEECH
                     self._speech_start_time = result.timestamp
-                    
+
                     logger.info("Speech started at %.3f seconds", result.timestamp)
-                    
+
                     if self._speech_start_callback:
                         self._speech_start_callback(result.timestamp)
         else:
             self._silence_frames += 1
             self._speech_frames = 0
-            
+
             # Transition from speech to silence
             if self._state == SpeechState.SPEECH:
                 # Similar logic for silence - need at least 1 chunk
                 if self._silence_frames >= 1:
                     self._state = SpeechState.SILENCE
-                    
+
                     speech_duration = result.timestamp - (self._speech_start_time or 0.0)
                     logger.info(
                         "Speech ended at %.3f seconds (duration: %.3f seconds)",
                         result.timestamp,
                         speech_duration,
                     )
-                    
+
                     if self._speech_end_callback:
                         self._speech_end_callback(result.timestamp)
-                    
+
                     self._speech_start_time = None
 
     def reset(self) -> None:
@@ -282,7 +282,7 @@ class VADModule:
         self._speech_frames = 0
         self._silence_frames = 0
         self._speech_start_time = None
-        
+
         logger.info("VAD state reset")
 
     @property

@@ -10,13 +10,13 @@ configurable voice settings for natural, empathetic speech generation.
 
 import logging
 import re
-from typing import AsyncIterator, List, Optional, Dict, Any
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 from elevenlabs import AsyncElevenLabs
 from elevenlabs.types import VoiceSettings as ElevenLabsVoiceSettings
-
 
 logger = logging.getLogger(__name__)
 
@@ -119,10 +119,10 @@ class ElevenLabsTTSService:
         """
         self.config = config
         self.client = AsyncElevenLabs(api_key=config.api_key)
-        
+
         # Cache for voice settings
-        self._voice_settings_cache: Dict[str, VoiceSettings] = {}
-        
+        self._voice_settings_cache: dict[str, VoiceSettings] = {}
+
         logger.info(
             "ElevenLabs TTS service initialized (voice: %s, model: %s)",
             config.default_voice_config.voice_id,
@@ -132,7 +132,7 @@ class ElevenLabsTTSService:
     async def synthesize_streaming(
         self,
         text: str,
-        voice_config: Optional[VoiceConfig] = None,
+        voice_config: VoiceConfig | None = None,
     ) -> AsyncIterator[bytes]:
         """
         Synthesize text to speech with streaming output.
@@ -153,12 +153,12 @@ class ElevenLabsTTSService:
         """
         if not text or not text.strip():
             raise ValueError("Text cannot be empty")
-        
+
         config = voice_config or self.config.default_voice_config
-        
+
         if config.provider != "elevenlabs":
             raise ValueError(f"ElevenLabs service requires provider='elevenlabs', got '{config.provider}'")
-        
+
         try:
             # Create voice settings
             voice_settings = ElevenLabsVoiceSettings(
@@ -167,14 +167,14 @@ class ElevenLabsTTSService:
                 style=config.style,
                 use_speaker_boost=config.use_speaker_boost,
             )
-            
+
             logger.info(
                 "Starting streaming synthesis (voice: %s, model: %s, length: %d chars)",
                 config.voice_id,
                 config.model_id,
                 len(text),
             )
-            
+
             # Stream audio generation
             audio_stream = await self.client.text_to_speech.convert(
                 voice_id=config.voice_id,
@@ -184,28 +184,28 @@ class ElevenLabsTTSService:
                 optimize_streaming_latency=self.config.optimize_streaming_latency,
                 output_format=self.config.output_format,
             )
-            
+
             # Yield audio chunks
             chunk_count = 0
             total_bytes = 0
-            
+
             async for chunk in audio_stream:
                 if chunk:
                     chunk_count += 1
                     total_bytes += len(chunk)
                     yield chunk
-            
+
             logger.info(
                 "Streaming synthesis complete (chunks: %d, total bytes: %d)",
                 chunk_count,
                 total_bytes,
             )
-            
+
         except Exception as e:
             logger.error("Failed to synthesize speech: %s", str(e))
             raise RuntimeError(f"Speech synthesis failed: {str(e)}") from e
 
-    def apply_emotional_context(self, text: str, tags: List[str]) -> str:
+    def apply_emotional_context(self, text: str, tags: list[str]) -> str:
         """
         Apply emotional context to text using audio tags.
         
@@ -221,10 +221,10 @@ class ElevenLabsTTSService:
         """
         # Start with original text
         modified_text = text
-        
+
         # Start with original text
         modified_text = text
-        
+
         # Map common emotional indicators to audio tags
         tag_mapping = {
             "empathetic": AudioTag.EMPATHETIC.value,
@@ -232,14 +232,14 @@ class ElevenLabsTTSService:
             "understanding": AudioTag.UNDERSTANDING.value,
             "questioning": AudioTag.QUESTIONING.value,
         }
-        
+
         # Apply tags based on content and emotional indicators (only if tags provided)
         if tags:
             for tag in tags:
                 audio_tag = tag_mapping.get(tag.lower())
                 if not audio_tag:
                     continue
-                
+
                 # Insert tag at appropriate position
                 if tag.lower() == "empathetic":
                     # Add empathetic tag at the beginning
@@ -261,22 +261,22 @@ class ElevenLabsTTSService:
                             pattern = re.compile(rf'({re.escape(phrase)})', re.IGNORECASE)
                             modified_text = pattern.sub(rf'{audio_tag}\1{audio_tag.replace("<", "</")}', modified_text, count=1)
                             break
-        
+
         # Add special audio effects for specific phrases (always check, regardless of tags)
         if any(word in text.lower() for word in ["sorry", "apologize", "unfortunately"]):
             # Add sigh before apologies
             if AudioTag.SIGH.value not in modified_text:
                 modified_text = f"{AudioTag.SIGH.value} {modified_text}"
-        
+
         logger.debug("Applied emotional tags: %s -> %s", tags, modified_text)
-        
+
         return modified_text
 
     async def clone_voice(
         self,
-        audio_samples: List[bytes],
+        audio_samples: list[bytes],
         voice_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> str:
         """
         Clone a voice from audio samples.
@@ -298,29 +298,29 @@ class ElevenLabsTTSService:
         """
         if not audio_samples:
             raise ValueError("At least one audio sample is required")
-        
+
         if not voice_name or not voice_name.strip():
             raise ValueError("Voice name cannot be empty")
-        
+
         try:
             logger.info(
                 "Starting voice cloning (name: %s, samples: %d)",
                 voice_name,
                 len(audio_samples),
             )
-            
+
             # Note: The actual ElevenLabs API for voice cloning requires file uploads
             # This is a simplified interface - in production, you'd need to:
             # 1. Save audio samples to temporary files
             # 2. Use the voice cloning API endpoint
             # 3. Clean up temporary files
-            
+
             # For now, we'll raise NotImplementedError with guidance
             raise NotImplementedError(
                 "Voice cloning requires file upload implementation. "
                 "Please use the ElevenLabs web interface or implement file handling."
             )
-            
+
         except NotImplementedError:
             raise
         except Exception as e:
@@ -347,13 +347,13 @@ class ElevenLabsTTSService:
         if voice_id in self._voice_settings_cache:
             logger.debug("Returning cached voice settings for: %s", voice_id)
             return self._voice_settings_cache[voice_id]
-        
+
         try:
             logger.info("Retrieving voice settings for: %s", voice_id)
-            
+
             # Get voice details from ElevenLabs
             voice = await self.client.voices.get(voice_id=voice_id)
-            
+
             # Extract settings
             settings = VoiceSettings(
                 stability=voice.settings.stability if voice.settings else 0.5,
@@ -361,24 +361,24 @@ class ElevenLabsTTSService:
                 style=voice.settings.style if voice.settings else 0.0,
                 use_speaker_boost=voice.settings.use_speaker_boost if voice.settings else True,
             )
-            
+
             # Cache the settings
             self._voice_settings_cache[voice_id] = settings
-            
+
             logger.info(
                 "Retrieved voice settings (stability: %.2f, similarity: %.2f, style: %.2f)",
                 settings.stability,
                 settings.similarity_boost,
                 settings.style,
             )
-            
+
             return settings
-            
+
         except Exception as e:
             logger.error("Failed to retrieve voice settings: %s", str(e))
             raise RuntimeError(f"Failed to get voice settings: {str(e)}") from e
 
-    async def list_available_voices(self) -> List[Dict[str, Any]]:
+    async def list_available_voices(self) -> list[dict[str, Any]]:
         """
         List all available voices from ElevenLabs.
         
@@ -390,9 +390,9 @@ class ElevenLabsTTSService:
         """
         try:
             logger.info("Listing available voices")
-            
+
             voices_response = await self.client.voices.get_all()
-            
+
             voices = []
             for voice in voices_response.voices:
                 voices.append({
@@ -402,11 +402,11 @@ class ElevenLabsTTSService:
                     "description": voice.description if hasattr(voice, "description") else None,
                     "labels": voice.labels if hasattr(voice, "labels") else {},
                 })
-            
+
             logger.info("Retrieved %d available voices", len(voices))
-            
+
             return voices
-            
+
         except Exception as e:
             logger.error("Failed to list voices: %s", str(e))
             raise RuntimeError(f"Failed to list voices: {str(e)}") from e

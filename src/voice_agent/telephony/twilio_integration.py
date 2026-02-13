@@ -9,10 +9,11 @@ import asyncio
 import base64
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import websockets
 from websockets.client import WebSocketClientProtocol
@@ -85,14 +86,14 @@ class CallMetadata:
     direction: str = "inbound"
     status: CallStatus = CallStatus.INITIATED
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     duration_seconds: float = 0.0
-    from_city: Optional[str] = None
-    from_state: Optional[str] = None
-    from_country: Optional[str] = None
-    custom_parameters: Dict[str, Any] = field(default_factory=dict)
+    from_city: str | None = None
+    from_state: str | None = None
+    from_country: str | None = None
+    custom_parameters: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert metadata to dictionary."""
         return {
             "call_sid": self.call_sid,
@@ -124,24 +125,24 @@ class TwilioIntegration:
             config: Twilio configuration
         """
         self.config = config
-        self._websocket: Optional[WebSocketClientProtocol] = None
-        self._call_metadata: Optional[CallMetadata] = None
+        self._websocket: WebSocketClientProtocol | None = None
+        self._call_metadata: CallMetadata | None = None
         self._is_connected = False
         self._is_active = False
-        self._stream_sid: Optional[str] = None
-        
+        self._stream_sid: str | None = None
+
         # Callbacks
-        self._on_audio_received: Optional[Callable[[bytes], None]] = None
-        self._on_call_started: Optional[Callable[[CallMetadata], None]] = None
-        self._on_call_ended: Optional[Callable[[CallMetadata], None]] = None
-        self._on_dtmf: Optional[Callable[[str], None]] = None
-        self._on_error: Optional[Callable[[Exception], None]] = None
-        
+        self._on_audio_received: Callable[[bytes], None] | None = None
+        self._on_call_started: Callable[[CallMetadata], None] | None = None
+        self._on_call_ended: Callable[[CallMetadata], None] | None = None
+        self._on_dtmf: Callable[[str], None] | None = None
+        self._on_error: Callable[[Exception], None] | None = None
+
         # Audio buffering
         self._audio_buffer: asyncio.Queue = asyncio.Queue()
-        self._receive_task: Optional[asyncio.Task] = None
-        self._send_task: Optional[asyncio.Task] = None
-        
+        self._receive_task: asyncio.Task | None = None
+        self._send_task: asyncio.Task | None = None
+
         logger.info(
             f"Initialized Twilio integration with {config.connection_type.value} "
             f"connection, {config.audio_format} format at {config.sample_rate}Hz"
@@ -158,12 +159,12 @@ class TwilioIntegration:
         return self._is_active
 
     @property
-    def call_metadata(self) -> Optional[CallMetadata]:
+    def call_metadata(self) -> CallMetadata | None:
         """Get current call metadata."""
         return self._call_metadata
 
     @property
-    def stream_sid(self) -> Optional[str]:
+    def stream_sid(self) -> str | None:
         """Get current stream SID."""
         return self._stream_sid
 
@@ -225,13 +226,13 @@ class TwilioIntegration:
             logger.info(f"Connecting to Twilio WebSocket: {websocket_url}")
             self._websocket = await websockets.connect(websocket_url)
             self._is_connected = True
-            
+
             # Start receive task
             self._receive_task = asyncio.create_task(self._receive_loop())
             self._send_task = asyncio.create_task(self._send_loop())
-            
+
             logger.info("Successfully connected to Twilio")
-            
+
         except Exception as e:
             logger.error(f"Failed to connect to Twilio: {e}")
             self._is_connected = False
@@ -242,10 +243,10 @@ class TwilioIntegration:
     async def disconnect(self) -> None:
         """Disconnect from Twilio and cleanup resources."""
         logger.info("Disconnecting from Twilio")
-        
+
         self._is_connected = False
         self._is_active = False
-        
+
         # Cancel tasks
         if self._receive_task and not self._receive_task.done():
             self._receive_task.cancel()
@@ -253,19 +254,19 @@ class TwilioIntegration:
                 await self._receive_task
             except asyncio.CancelledError:
                 pass
-        
+
         if self._send_task and not self._send_task.done():
             self._send_task.cancel()
             try:
                 await self._send_task
             except asyncio.CancelledError:
                 pass
-        
+
         # Close WebSocket
         if self._websocket:
             await self._websocket.close()
             self._websocket = None
-        
+
         logger.info("Disconnected from Twilio")
 
     async def send_audio(self, audio_data: bytes) -> None:
@@ -279,7 +280,7 @@ class TwilioIntegration:
         """
         if not self._is_connected or not self._websocket:
             raise RuntimeError("Not connected to Twilio")
-        
+
         # Add to send queue
         await self._audio_buffer.put(audio_data)
 
@@ -289,13 +290,13 @@ class TwilioIntegration:
             while self._is_connected:
                 # Get audio from buffer
                 audio_data = await self._audio_buffer.get()
-                
+
                 if not self._websocket or not self._stream_sid:
                     continue
-                
+
                 # Encode audio as base64
                 audio_base64 = base64.b64encode(audio_data).decode("utf-8")
-                
+
                 # Create media message
                 message = {
                     "event": "media",
@@ -304,10 +305,10 @@ class TwilioIntegration:
                         "payload": audio_base64
                     }
                 }
-                
+
                 # Send to Twilio
                 await self._websocket.send(json.dumps(message))
-                
+
         except asyncio.CancelledError:
             logger.debug("Send loop cancelled")
         except Exception as e:
@@ -322,10 +323,10 @@ class TwilioIntegration:
                 # Receive message
                 message_str = await self._websocket.recv()
                 message = json.loads(message_str)
-                
+
                 # Handle message based on event type
                 event = message.get("event")
-                
+
                 if event == "connected":
                     await self._handle_connected(message)
                 elif event == "start":
@@ -338,7 +339,7 @@ class TwilioIntegration:
                     await self._handle_dtmf(message)
                 else:
                     logger.warning(f"Unknown event type: {event}")
-                    
+
         except asyncio.CancelledError:
             logger.debug("Receive loop cancelled")
         except websockets.exceptions.ConnectionClosed:
@@ -350,7 +351,7 @@ class TwilioIntegration:
             if self._on_error:
                 self._on_error(e)
 
-    async def _handle_connected(self, message: Dict[str, Any]) -> None:
+    async def _handle_connected(self, message: dict[str, Any]) -> None:
         """Handle connected event from Twilio.
         
         Args:
@@ -359,24 +360,24 @@ class TwilioIntegration:
         logger.info("Received connected event from Twilio")
         logger.debug(f"Connected message: {message}")
 
-    async def _handle_start(self, message: Dict[str, Any]) -> None:
+    async def _handle_start(self, message: dict[str, Any]) -> None:
         """Handle start event from Twilio.
         
         Args:
             message: Start event message with call metadata
         """
         logger.info("Received start event from Twilio")
-        
+
         # Extract stream SID
         self._stream_sid = message.get("streamSid")
-        
+
         # Extract call metadata
         start_data = message.get("start", {})
         call_sid = start_data.get("callSid", "")
-        
+
         # Extract custom parameters
         custom_params = start_data.get("customParameters", {})
-        
+
         # Create call metadata
         self._call_metadata = CallMetadata(
             call_sid=call_sid,
@@ -389,19 +390,19 @@ class TwilioIntegration:
             from_country=custom_params.get("FromCountry"),
             custom_parameters=custom_params,
         )
-        
+
         self._is_active = True
-        
+
         logger.info(
             f"Call started: {call_sid} from {self._call_metadata.caller_id} "
             f"to {self._call_metadata.called_number}"
         )
-        
+
         # Notify callback
         if self._on_call_started:
             self._on_call_started(self._call_metadata)
 
-    async def _handle_media(self, message: Dict[str, Any]) -> None:
+    async def _handle_media(self, message: dict[str, Any]) -> None:
         """Handle media event from Twilio.
         
         Args:
@@ -409,54 +410,54 @@ class TwilioIntegration:
         """
         media_data = message.get("media", {})
         payload = media_data.get("payload", "")
-        
+
         if not payload:
             return
-        
+
         # Decode base64 audio
         try:
             audio_data = base64.b64decode(payload)
-            
+
             # Notify callback
             if self._on_audio_received:
                 self._on_audio_received(audio_data)
-                
+
         except Exception as e:
             logger.error(f"Error decoding audio data: {e}")
             if self._on_error:
                 self._on_error(e)
 
-    async def _handle_stop(self, message: Dict[str, Any]) -> None:
+    async def _handle_stop(self, message: dict[str, Any]) -> None:
         """Handle stop event from Twilio.
         
         Args:
             message: Stop event message
         """
         logger.info("Received stop event from Twilio")
-        
+
         self._is_active = False
-        
+
         # Update call metadata
         if self._call_metadata:
             self._call_metadata.status = CallStatus.COMPLETED
             self._call_metadata.end_time = datetime.now()
-            
+
             # Calculate duration
             duration = (
                 self._call_metadata.end_time - self._call_metadata.start_time
             ).total_seconds()
             self._call_metadata.duration_seconds = duration
-            
+
             logger.info(
                 f"Call ended: {self._call_metadata.call_sid}, "
                 f"duration: {duration:.2f}s"
             )
-            
+
             # Notify callback
             if self._on_call_ended:
                 self._on_call_ended(self._call_metadata)
 
-    async def _handle_dtmf(self, message: Dict[str, Any]) -> None:
+    async def _handle_dtmf(self, message: dict[str, Any]) -> None:
         """Handle DTMF event from Twilio.
         
         Args:
@@ -464,18 +465,18 @@ class TwilioIntegration:
         """
         if not self.config.enable_dtmf:
             return
-        
+
         dtmf_data = message.get("dtmf", {})
         digit = dtmf_data.get("digit", "")
-        
+
         if digit:
             logger.debug(f"Received DTMF digit: {digit}")
-            
+
             # Notify callback
             if self._on_dtmf:
                 self._on_dtmf(digit)
 
-    def get_call_metadata(self) -> Optional[CallMetadata]:
+    def get_call_metadata(self) -> CallMetadata | None:
         """Get current call metadata.
         
         Returns:
@@ -483,7 +484,7 @@ class TwilioIntegration:
         """
         return self._call_metadata
 
-    def extract_caller_id(self) -> Optional[str]:
+    def extract_caller_id(self) -> str | None:
         """Extract caller ID from current call.
         
         Returns:
@@ -493,7 +494,7 @@ class TwilioIntegration:
             return self._call_metadata.caller_id
         return None
 
-    def extract_call_sid(self) -> Optional[str]:
+    def extract_call_sid(self) -> str | None:
         """Extract call SID from current call.
         
         Returns:

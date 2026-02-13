@@ -635,7 +635,7 @@ class TestSentimentAnalysisIntegration:
         """Test that low sentiment scores trigger alerts."""
         # Very negative transcript
         transcript = "This is absolutely terrible, awful, and horrible. Very disappointed."
-        
+
         initial_alert_count = platform_without_twilio_ci.get_alert_count()
         result = platform_without_twilio_ci.analyze_sentiment("session_123", transcript)
 

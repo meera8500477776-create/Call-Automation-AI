@@ -1,6 +1,5 @@
 """Tests for structured logging."""
 
-import structlog
 
 from voice_agent.monitoring.logger import (
     bind_context,

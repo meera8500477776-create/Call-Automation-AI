@@ -4,10 +4,10 @@ Requirements: 10.4, 10.5
 """
 
 import pytest
+
 from voice_agent.core.tool_executor import (
-    ToolExecutor,
     ToolDefinition,
-    ToolResult,
+    ToolExecutor,
 )
 
 

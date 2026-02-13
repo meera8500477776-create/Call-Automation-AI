@@ -1,7 +1,7 @@
 """Configuration schema data models using Pydantic."""
 
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -70,7 +70,7 @@ class TTSConfig(BaseModel):
     """Text-to-Speech configuration."""
 
     provider: TTSProvider = Field(..., description="TTS provider")
-    voice_settings: Optional[VoiceSettings] = Field(
+    voice_settings: VoiceSettings | None = Field(
         default=None, description="Voice synthesis settings (ElevenLabs only)"
     )
 
@@ -100,13 +100,13 @@ class ToolDefinition(BaseModel):
     description: str = Field(..., description="Human-readable tool description")
     endpoint: str = Field(..., description="API endpoint URL")
     auth_type: AuthType = Field(..., description="Authentication type")
-    scopes: Optional[List[str]] = Field(
+    scopes: list[str] | None = Field(
         default=None, description="OAuth2 scopes (if auth_type is oauth2)"
     )
-    api_key_name: Optional[str] = Field(
+    api_key_name: str | None = Field(
         default=None, description="API key parameter name (if auth_type is api_key)"
     )
-    parameters_schema: Dict[str, Any] = Field(
+    parameters_schema: dict[str, Any] = Field(
         ..., description="JSON schema for tool parameters"
     )
 
@@ -127,7 +127,7 @@ class KnowledgeBaseConfig(BaseModel):
 
     type: str = Field(..., description="Knowledge base type (e.g., vector_db, document)")
     source: str = Field(..., description="Source path or identifier")
-    description: Optional[str] = Field(default=None, description="Knowledge base description")
+    description: str | None = Field(default=None, description="Knowledge base description")
 
     model_config = {"extra": "forbid"}
 
@@ -157,11 +157,11 @@ class TenantConfig(BaseModel):
     tenant_id: str = Field(..., description="Unique tenant identifier")
     persona: PersonaConfig = Field(..., description="Persona configuration")
     llm: LLMConfig = Field(..., description="LLM configuration")
-    tts: Optional[TTSConfig] = Field(default=None, description="TTS configuration")
-    tools: List[ToolDefinition] = Field(
+    tts: TTSConfig | None = Field(default=None, description="TTS configuration")
+    tools: list[ToolDefinition] = Field(
         default_factory=list, description="Available tools for the agent"
     )
-    knowledge_bases: List[KnowledgeBaseConfig] = Field(
+    knowledge_bases: list[KnowledgeBaseConfig] = Field(
         default_factory=list, description="Knowledge bases for the agent"
     )
     constraints: ConstraintsConfig = Field(
@@ -170,7 +170,7 @@ class TenantConfig(BaseModel):
 
     @field_validator("tools")
     @classmethod
-    def validate_unique_tool_names(cls, v: List[ToolDefinition]) -> List[ToolDefinition]:
+    def validate_unique_tool_names(cls, v: list[ToolDefinition]) -> list[ToolDefinition]:
         """Validate that tool names are unique."""
         tool_names = [tool.name for tool in v]
         if len(tool_names) != len(set(tool_names)):

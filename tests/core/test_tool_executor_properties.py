@@ -3,10 +3,10 @@
 **Validates: Requirements 10.4**
 """
 
-from hypothesis import given, strategies as st, settings, assume
-import pytest
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
-from voice_agent.core.tool_executor import ToolExecutor, ToolDefinition, ToolResult
+from voice_agent.core.tool_executor import ToolDefinition, ToolExecutor
 
 
 # JSON Schema strategies for generating valid and invalid parameters

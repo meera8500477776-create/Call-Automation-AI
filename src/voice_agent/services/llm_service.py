@@ -10,9 +10,8 @@ import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 from enum import Enum
-
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +41,9 @@ class Intent:
     """
     name: str
     confidence: float
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
     requires_tool: bool = False
-    tool_name: Optional[str] = None
+    tool_name: str | None = None
 
     def __post_init__(self):
         """Validate intent data."""
@@ -65,8 +64,8 @@ class ToolCall:
         timestamp: When the tool call was created (ISO format)
     """
     tool_name: str
-    parameters: Dict[str, Any]
-    timestamp: Optional[str] = None
+    parameters: dict[str, Any]
+    timestamp: str | None = None
 
 
 @dataclass
@@ -85,11 +84,11 @@ class LLMResponse:
     """
     text: str
     intent: Intent
-    parameters: Dict[str, Any] = field(default_factory=dict)
-    tool_call: Optional[ToolCall] = None
+    parameters: dict[str, Any] = field(default_factory=dict)
+    tool_call: ToolCall | None = None
     confidence: float = 1.0
-    emotional_tags: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    emotional_tags: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Validate response data."""
@@ -147,11 +146,11 @@ class ConversationContext:
         metadata: Additional context metadata
     """
     session_id: str
-    conversation_history: List[Dict[str, str]] = field(default_factory=list)
-    extracted_parameters: Dict[str, Any] = field(default_factory=dict)
-    current_intent: Optional[str] = None
-    tenant_config: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    conversation_history: list[dict[str, str]] = field(default_factory=list)
+    extracted_parameters: dict[str, Any] = field(default_factory=dict)
+    current_intent: str | None = None
+    tenant_config: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class LLMService(ABC):
@@ -212,7 +211,7 @@ class LLMService(ABC):
             Classified intent with confidence score
         """
         transcript_lower = transcript.lower()
-        
+
         # Simple keyword-based classification (order matters - check specific intents first)
         if any(word in transcript_lower for word in ["speak to", "talk to", "human", "agent", "person"]):
             return Intent(
@@ -256,7 +255,7 @@ class LLMService(ABC):
                 requires_tool=False,
             )
 
-    def extract_parameters(self, transcript: str, intent: Intent) -> Dict[str, Any]:
+    def extract_parameters(self, transcript: str, intent: Intent) -> dict[str, Any]:
         """
         Extract structured parameters from transcript.
         
@@ -271,7 +270,7 @@ class LLMService(ABC):
             Dictionary of extracted parameters
         """
         parameters = {}
-        
+
         # Extract date patterns
         date_patterns = [
             r"(?:on\s+)?(\w+day)",  # Monday, Tuesday, etc.
@@ -283,7 +282,7 @@ class LLMService(ABC):
             if match:
                 parameters["date"] = match.group(1)
                 break
-        
+
         # Extract time patterns
         time_patterns = [
             r"(\d{1,2}:\d{2}\s*(?:am|pm)?)",  # 2:30pm
@@ -295,17 +294,17 @@ class LLMService(ABC):
             if match:
                 parameters["time"] = match.group(1)
                 break
-        
+
         # Extract reason/service type
         if "for" in transcript.lower():
             parts = transcript.lower().split("for", 1)
             if len(parts) > 1:
                 reason = parts[1].strip().split()[0:5]  # Take first few words
                 parameters["reason"] = " ".join(reason)
-        
+
         return parameters
 
-    def should_use_tool(self, intent: Intent, parameters: Dict[str, Any]) -> Optional[ToolCall]:
+    def should_use_tool(self, intent: Intent, parameters: dict[str, Any]) -> ToolCall | None:
         """
         Determine if tool execution is needed.
         
@@ -318,10 +317,10 @@ class LLMService(ABC):
         """
         if not intent.requires_tool:
             return None
-        
+
         # Check if we have sufficient parameters for tool execution
         required_params = self._get_required_parameters(intent.tool_name)
-        
+
         # For now, create tool call even with partial parameters
         # The tool executor will handle validation
         if intent.tool_name:
@@ -329,7 +328,7 @@ class LLMService(ABC):
                 tool_name=intent.tool_name,
                 parameters=parameters,
             )
-        
+
         return None
 
     def format_for_voice(self, response: str) -> str:
@@ -351,32 +350,32 @@ class LLMService(ABC):
         text = re.sub(r'`(.+?)`', r'\1', text)  # Code
         text = re.sub(r'^\s*#+\s*', '', text, flags=re.MULTILINE)  # Headers (with optional leading whitespace)
         text = re.sub(r'\[(.+?)\]\(.+?\)', r'\1', text)  # Links
-        
+
         # Remove bullet points and list markers
         text = re.sub(r'^\s*[-*•]\s+', '', text, flags=re.MULTILINE)
         text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)
-        
+
         # Remove tables (remove lines containing pipes)
         lines = text.split('\n')
         text = '\n'.join(line for line in lines if '|' not in line)
-        
+
         # Split into sentences - match sentence-ending punctuation followed by space and capital letter
         # or sentence-ending punctuation at end of string
         # This avoids splitting on decimal points like "3.14" or abbreviations
         sentences = re.split(r'(?<=[.!?])(?:\s+(?=[A-Z])|$)', text)
         sentences = [s.strip() for s in sentences if s.strip()]
-        
+
         # Limit to 3 sentences for voice brevity
         if len(sentences) > 3:
             sentences = sentences[:3]
-        
+
         # Rejoin sentences with space (they already have punctuation)
         result = ' '.join(sentences)
-        
+
         # Add period only if there's no ending punctuation
         if result and not result.endswith(('.', '!', '?')):
             result += '.'
-        
+
         # Final check: ensure we don't have more than 3 sentence-ending punctuation marks total
         # This handles edge cases like "00000000.0. 00000000.0." which has 4 periods
         # Count ALL periods, exclamation marks, and question marks
@@ -390,10 +389,10 @@ class LLMService(ABC):
                     if count == 3:
                         result = result[:i+1].rstrip()
                         break
-        
+
         return result
 
-    def _get_required_parameters(self, tool_name: Optional[str]) -> List[str]:
+    def _get_required_parameters(self, tool_name: str | None) -> list[str]:
         """
         Get required parameters for a tool.
         
@@ -410,5 +409,5 @@ class LLMService(ABC):
             "cancel_appointment": ["appointment_id"],
             "search_appointments": ["date"],
         }
-        
+
         return tool_params.get(tool_name, [])

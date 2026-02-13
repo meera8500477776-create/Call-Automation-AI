@@ -23,7 +23,7 @@ class TestValidationResult:
             llm={"provider": "openai", "model": "gpt-4"},
         )
         result = ValidationResult(is_valid=True, config=config)
-        
+
         assert result.is_valid
         assert result.config == config
         assert len(result.errors) == 0
@@ -33,7 +33,7 @@ class TestValidationResult:
         """Test creating an invalid validation result."""
         errors = ["Error 1", "Error 2"]
         result = ValidationResult(is_valid=False, errors=errors)
-        
+
         assert not result.is_valid
         assert result.config is None
         assert result.errors == errors
@@ -51,7 +51,7 @@ class TestValidationResult:
             llm={"provider": "openai", "model": "gpt-4"},
         )
         result = ValidationResult(is_valid=True, config=config)
-        
+
         repr_str = repr(result)
         assert "valid=True" in repr_str
         assert "test_tenant" in repr_str
@@ -59,7 +59,7 @@ class TestValidationResult:
     def test_repr_invalid(self):
         """Test string representation of invalid result."""
         result = ValidationResult(is_valid=False, errors=["Error 1", "Error 2"])
-        
+
         repr_str = repr(result)
         assert "valid=False" in repr_str
         assert "errors=2" in repr_str
@@ -84,9 +84,9 @@ class TestConfigValidator:
                 "max_tokens": 150,
             },
         }
-        
+
         result = ConfigValidator.validate_dict(config_dict)
-        
+
         assert result.is_valid
         assert result.config is not None
         assert result.config.tenant_id == "test_tenant_001"
@@ -103,9 +103,9 @@ class TestConfigValidator:
                 # Missing voice_id and system_prompt
             },
         }
-        
+
         result = ConfigValidator.validate_dict(config_dict)
-        
+
         assert not result.is_valid
         assert result.config is None
         assert len(result.errors) > 0
@@ -127,9 +127,9 @@ class TestConfigValidator:
                 "temperature": "invalid",  # Should be float
             },
         }
-        
+
         result = ConfigValidator.validate_dict(config_dict)
-        
+
         assert not result.is_valid
         assert len(result.errors) > 0
 
@@ -147,9 +147,9 @@ class TestConfigValidator:
                 "model": "gpt-4",
             },
         }
-        
+
         result = ConfigValidator.validate_dict(config_dict)
-        
+
         assert not result.is_valid
         assert any("provider" in error for error in result.errors)
 
@@ -175,9 +175,9 @@ class TestConfigValidator:
                 }
             ],
         }
-        
+
         result = ConfigValidator.validate_dict(config_dict)
-        
+
         assert result.is_valid
         assert len(result.config.tools) == 1
         assert result.config.tools[0].name == "search_appointments"
@@ -213,9 +213,9 @@ class TestConfigValidator:
                 },
             ],
         }
-        
+
         result = ConfigValidator.validate_dict(config_dict)
-        
+
         assert not result.is_valid
         assert any("unique" in error.lower() for error in result.errors)
 
@@ -234,9 +234,9 @@ llm:
   model: gpt-4
 """
         )
-        
+
         result = ConfigValidator.validate_file(config_file)
-        
+
         assert result.is_valid
         assert result.config.tenant_id == "test_tenant_001"
 
@@ -254,16 +254,16 @@ llm:
   model: gpt-4
 """
         )
-        
+
         result = ConfigValidator.validate_file(config_file)
-        
+
         assert not result.is_valid
         assert len(result.errors) > 0
 
     def test_validate_file_nonexistent(self):
         """Test validating a nonexistent file."""
         result = ConfigValidator.validate_file(Path("/nonexistent/config.yaml"))
-        
+
         assert not result.is_valid
         assert len(result.errors) > 0
         assert any("not found" in error.lower() for error in result.errors)
@@ -283,9 +283,9 @@ llm:
   model: gpt-4
 """
         )
-        
+
         config = ConfigValidator.load_and_validate(config_file)
-        
+
         assert isinstance(config, TenantConfig)
         assert config.tenant_id == "test_tenant_001"
 
@@ -300,10 +300,10 @@ persona:
   # Missing required fields
 """
         )
-        
+
         with pytest.raises(ValueError) as exc_info:
             ConfigValidator.load_and_validate(config_file)
-        
+
         assert "Invalid configuration" in str(exc_info.value)
 
     def test_validate_complete_healthcare_config(self, tmp_path):
@@ -354,9 +354,9 @@ constraints:
   transfer_to_human_on_error: true
 """
         )
-        
+
         result = ConfigValidator.validate_file(config_file)
-        
+
         assert result.is_valid
         assert result.config.tenant_id == "healthcare_clinic_001"
         assert len(result.config.tools) == 1

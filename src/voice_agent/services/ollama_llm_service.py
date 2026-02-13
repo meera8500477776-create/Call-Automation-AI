@@ -9,22 +9,16 @@ and fallback handling for model unavailability.
 """
 
 import logging
-import json
-from typing import Optional, List, Dict, Any, AsyncIterator
 from datetime import datetime, timezone
 
 import aiohttp
 
 from .llm_service import (
-    LLMService,
+    ConversationContext,
     LLMConfig,
     LLMResponse,
-    Intent,
-    IntentType,
-    ToolCall,
-    ConversationContext,
+    LLMService,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +36,7 @@ class OllamaLLMService(LLMService):
         config: LLMConfig,
         base_url: str = "http://localhost:11434",
         gpu_enabled: bool = True,
-        fallback_service: Optional[LLMService] = None,
+        fallback_service: LLMService | None = None,
     ):
         """
         Initialize Ollama LLM service.
@@ -54,16 +48,16 @@ class OllamaLLMService(LLMService):
             fallback_service: Fallback LLM service if Ollama is unavailable
         """
         super().__init__(config)
-        
+
         if config.provider != "ollama":
             raise ValueError(f"Ollama service requires provider='ollama', got '{config.provider}'")
-        
+
         self.base_url = base_url.rstrip("/")
         self.gpu_enabled = gpu_enabled
         self.fallback_service = fallback_service
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._model_available = None  # Cache model availability
-        
+
         logger.info(
             "Ollama LLM service initialized (model: %s, GPU: %s, base_url: %s)",
             config.model,
@@ -99,7 +93,7 @@ class OllamaLLMService(LLMService):
         # Return cached result if available
         if self._model_available is not None:
             return self._model_available
-        
+
         try:
             session = await self._get_session()
             async with session.get(f"{self.base_url}/api/tags") as response:
@@ -107,25 +101,25 @@ class OllamaLLMService(LLMService):
                     data = await response.json()
                     models = data.get("models", [])
                     model_names = [m.get("name", "") for m in models]
-                    
+
                     # Check if our model is in the list
                     self._model_available = any(
                         self.config.model in name for name in model_names
                     )
-                    
+
                     if not self._model_available:
                         logger.warning(
                             "Model '%s' not found in Ollama. Available models: %s",
                             self.config.model,
                             model_names,
                         )
-                    
+
                     return self._model_available
                 else:
                     logger.error("Failed to check Ollama models: HTTP %d", response.status)
                     self._model_available = False
                     return False
-                    
+
         except Exception as e:
             logger.error("Error checking Ollama model availability: %s", str(e))
             self._model_available = False
@@ -154,7 +148,7 @@ class OllamaLLMService(LLMService):
         """
         # Check if model is available
         is_available = await self.check_model_availability()
-        
+
         if not is_available:
             logger.warning("Ollama model unavailable, attempting fallback")
             if self.fallback_service:
@@ -169,20 +163,20 @@ class OllamaLLMService(LLMService):
                 raise RuntimeError(
                     f"Ollama model '{self.config.model}' is not available and no fallback configured"
                 )
-        
+
         try:
             # Build prompt with voice-optimized instructions
             prompt = self._build_prompt(transcript, context)
-            
+
             # Call Ollama API
             response_text = await self._call_ollama(prompt)
-            
+
             # Parse response and extract intent/parameters
             return self._parse_response(response_text, transcript)
-            
+
         except Exception as e:
             logger.error("Ollama API error: %s", str(e))
-            
+
             # Try fallback if available
             if self.fallback_service:
                 logger.info("Attempting fallback service after Ollama error")
@@ -190,7 +184,7 @@ class OllamaLLMService(LLMService):
                     return await self.fallback_service.generate_response(transcript, context)
                 except Exception as fallback_error:
                     logger.error("Fallback service failed: %s", str(fallback_error))
-            
+
             raise RuntimeError(f"Failed to generate LLM response: {str(e)}") from e
 
     async def _call_ollama(self, prompt: str) -> str:
@@ -207,7 +201,7 @@ class OllamaLLMService(LLMService):
             RuntimeError: If API call fails
         """
         session = await self._get_session()
-        
+
         payload = {
             "model": self.config.model,
             "prompt": prompt,
@@ -218,11 +212,11 @@ class OllamaLLMService(LLMService):
                 "top_p": self.config.top_p,
             },
         }
-        
+
         # Add GPU configuration if enabled
         if self.gpu_enabled:
             payload["options"]["num_gpu"] = -1  # Use all available GPUs
-        
+
         try:
             async with session.post(
                 f"{self.base_url}/api/generate",
@@ -236,7 +230,7 @@ class OllamaLLMService(LLMService):
                     raise RuntimeError(
                         f"Ollama API returned status {response.status}: {error_text}"
                     )
-                    
+
         except aiohttp.ClientError as e:
             raise RuntimeError(f"Network error calling Ollama: {str(e)}") from e
 
@@ -257,7 +251,7 @@ class OllamaLLMService(LLMService):
         """
         # Start with system prompt
         system_prompt = self._build_voice_optimized_system_prompt()
-        
+
         # Add conversation history
         history_text = ""
         for turn in context.conversation_history[-5:]:  # Last 5 turns
@@ -267,7 +261,7 @@ class OllamaLLMService(LLMService):
                 history_text += f"\nUser: {content}"
             elif role == "assistant":
                 history_text += f"\nAssistant: {content}"
-        
+
         # Build complete prompt
         prompt = f"""{system_prompt}
 
@@ -275,7 +269,7 @@ class OllamaLLMService(LLMService):
 
 User: {transcript}
 Assistant:"""
-        
+
         return prompt
 
     def _build_voice_optimized_system_prompt(self) -> str:
@@ -292,7 +286,7 @@ Assistant:"""
             Voice-optimized system prompt
         """
         base_prompt = self.config.system_prompt or "You are a helpful voice assistant."
-        
+
         voice_instructions = """
 
 CRITICAL VOICE RESPONSE RULES:
@@ -308,7 +302,7 @@ CRITICAL VOICE RESPONSE RULES:
 10. Avoid technical jargon unless specifically requested
 
 Remember: Your responses will be spoken aloud by a text-to-speech system. Write as you would speak naturally in a conversation."""
-        
+
         return base_prompt + voice_instructions
 
     def _parse_response(
@@ -331,24 +325,24 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         """
         # Classify intent from original transcript
         intent = self.classify_intent(original_transcript)
-        
+
         # Extract parameters from transcript
         parameters = self.extract_parameters(original_transcript, intent)
-        
+
         # Determine if tool should be used
         tool_call = self.should_use_tool(intent, parameters)
-        
+
         # If we have a tool call, add timestamp
         if tool_call:
             tool_call.timestamp = datetime.now(timezone.utc).isoformat()
             logger.info("Tool call detected: %s with params: %s", tool_call.tool_name, parameters)
-        
+
         # Apply voice optimization to response
         formatted_text = self.format_for_voice(response_text)
-        
+
         # Extract emotional tags
         emotional_tags = self._extract_emotional_tags(response_text)
-        
+
         return LLMResponse(
             text=formatted_text,
             intent=intent,
@@ -363,7 +357,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             },
         )
 
-    def _extract_emotional_tags(self, text: str) -> List[str]:
+    def _extract_emotional_tags(self, text: str) -> list[str]:
         """
         Extract emotional tags for TTS from response text.
         
@@ -378,7 +372,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         """
         tags = []
         text_lower = text.lower()
-        
+
         # Detect emotional context
         if any(word in text_lower for word in ["sorry", "apologize", "unfortunately"]):
             tags.append("empathetic")
@@ -388,7 +382,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             tags.append("understanding")
         if "?" in text:
             tags.append("questioning")
-        
+
         return tags
 
     async def __aenter__(self):

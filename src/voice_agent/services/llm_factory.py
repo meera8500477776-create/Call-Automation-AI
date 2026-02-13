@@ -9,15 +9,15 @@ failover logic for high availability.
 """
 
 import logging
-import aiohttp
-from typing import Optional, Dict, Any
 from enum import Enum
+from typing import Any
 
-from .llm_service import LLMService, LLMConfig
-from .openai_llm_service import OpenAILLMService
+import aiohttp
+
+from .llm_service import LLMConfig, LLMService
 from .ollama_llm_service import OllamaLLMService
+from .openai_llm_service import OpenAILLMService
 from .vllm_llm_service import vLLMLLMService
-
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class LLMProviderFactory:
 
     def __init__(
         self,
-        openai_api_key: Optional[str] = None,
+        openai_api_key: str | None = None,
         ollama_base_url: str = "http://localhost:11434",
         vllm_base_url: str = "http://localhost:8000",
         enable_failover: bool = True,
@@ -58,10 +58,10 @@ class LLMProviderFactory:
         self.ollama_base_url = ollama_base_url
         self.vllm_base_url = vllm_base_url
         self.enable_failover = enable_failover
-        
+
         # Cache for provider health status
-        self._health_cache: Dict[str, ProviderHealth] = {}
-        
+        self._health_cache: dict[str, ProviderHealth] = {}
+
         logger.info(
             "LLM provider factory initialized (failover: %s)",
             "enabled" if enable_failover else "disabled",
@@ -70,7 +70,7 @@ class LLMProviderFactory:
     async def create_llm_service(
         self,
         config: LLMConfig,
-        provider_config: Optional[Dict[str, Any]] = None,
+        provider_config: dict[str, Any] | None = None,
     ) -> LLMService:
         """
         Create LLM service instance based on configuration.
@@ -92,21 +92,21 @@ class LLMProviderFactory:
             RuntimeError: If provider creation fails and no fallback available
         """
         provider_config = provider_config or {}
-        
+
         # Check provider health
         health = await self.check_provider_health(config.provider)
-        
+
         if health == ProviderHealth.UNAVAILABLE and self.enable_failover:
             logger.warning(
                 "Primary provider '%s' is unavailable, attempting failover",
                 config.provider,
             )
             return await self._create_with_failover(config, provider_config)
-        
+
         # Create primary provider
         try:
             service = await self._create_provider(config, provider_config)
-            
+
             # If failover is enabled, add fallback service
             if self.enable_failover:
                 fallback = await self._create_fallback_service(config, provider_config)
@@ -118,12 +118,12 @@ class LLMProviderFactory:
                             "Configured fallback service for provider '%s'",
                             config.provider,
                         )
-            
+
             return service
-            
+
         except Exception as e:
             logger.error("Failed to create provider '%s': %s", config.provider, str(e))
-            
+
             if self.enable_failover:
                 logger.info("Attempting failover after provider creation failure")
                 return await self._create_with_failover(config, provider_config)
@@ -135,7 +135,7 @@ class LLMProviderFactory:
     async def _create_provider(
         self,
         config: LLMConfig,
-        provider_config: Dict[str, Any],
+        provider_config: dict[str, Any],
     ) -> LLMService:
         """
         Create provider instance without failover logic.
@@ -151,13 +151,13 @@ class LLMProviderFactory:
             ValueError: If provider is not supported
         """
         provider = config.provider.lower()
-        
+
         if provider == "openai":
             return OpenAILLMService(
                 config=config,
                 api_key=provider_config.get("api_key", self.openai_api_key),
             )
-        
+
         elif provider == "ollama":
             return OllamaLLMService(
                 config=config,
@@ -165,7 +165,7 @@ class LLMProviderFactory:
                 gpu_enabled=provider_config.get("gpu_enabled", True),
                 fallback_service=None,  # Will be set by create_llm_service if needed
             )
-        
+
         elif provider == "vllm":
             return vLLMLLMService(
                 config=config,
@@ -175,15 +175,15 @@ class LLMProviderFactory:
                 max_model_len=provider_config.get("max_model_len"),
                 fallback_service=None,  # Will be set by create_llm_service if needed
             )
-        
+
         else:
             raise ValueError(f"Unsupported LLM provider: {provider}")
 
     async def _create_fallback_service(
         self,
         primary_config: LLMConfig,
-        provider_config: Dict[str, Any],
-    ) -> Optional[LLMService]:
+        provider_config: dict[str, Any],
+    ) -> LLMService | None:
         """
         Create fallback service for the primary provider.
         
@@ -199,7 +199,7 @@ class LLMProviderFactory:
             Fallback service instance or None if no fallback available
         """
         primary_provider = primary_config.provider.lower()
-        
+
         # Local providers fall back to OpenAI
         if primary_provider in ["ollama", "vllm"]:
             try:
@@ -215,29 +215,29 @@ class LLMProviderFactory:
                     presence_penalty=primary_config.presence_penalty,
                     timeout=primary_config.timeout,
                 )
-                
+
                 fallback = OpenAILLMService(
                     config=fallback_config,
                     api_key=provider_config.get("api_key", self.openai_api_key),
                 )
-                
+
                 logger.info(
                     "Created OpenAI fallback service for primary provider '%s'",
                     primary_provider,
                 )
                 return fallback
-                
+
             except Exception as e:
                 logger.warning("Failed to create fallback service: %s", str(e))
                 return None
-        
+
         # OpenAI has no fallback
         return None
 
     async def _create_with_failover(
         self,
         config: LLMConfig,
-        provider_config: Dict[str, Any],
+        provider_config: dict[str, Any],
     ) -> LLMService:
         """
         Create service with automatic failover to alternative provider.
@@ -253,7 +253,7 @@ class LLMProviderFactory:
             RuntimeError: If all providers fail
         """
         primary_provider = config.provider.lower()
-        
+
         # Try fallback providers in order
         if primary_provider in ["ollama", "vllm"]:
             # Try OpenAI as fallback
@@ -270,15 +270,15 @@ class LLMProviderFactory:
                     presence_penalty=config.presence_penalty,
                     timeout=config.timeout,
                 )
-                
+
                 return await self._create_provider(fallback_config, provider_config)
-                
+
             except Exception as e:
                 logger.error("OpenAI fallback also failed: %s", str(e))
                 raise RuntimeError(
                     f"All LLM providers failed. Primary: {primary_provider}, Fallback: OpenAI"
                 ) from e
-        
+
         else:
             # OpenAI has no fallback
             raise RuntimeError(
@@ -300,35 +300,35 @@ class LLMProviderFactory:
             Provider health status
         """
         provider = provider.lower()
-        
+
         # Return cached health if available (cache for 60 seconds)
         if provider in self._health_cache:
             return self._health_cache[provider]
-        
+
         try:
             if provider == "openai":
                 # OpenAI is always considered healthy (cloud service)
                 # Could add actual API check if needed
                 health = ProviderHealth.HEALTHY
-            
+
             elif provider == "ollama":
                 # Check Ollama server availability
                 health = await self._check_ollama_health()
-            
+
             elif provider == "vllm":
                 # Check vLLM server availability
                 health = await self._check_vllm_health()
-            
+
             else:
                 logger.warning("Unknown provider '%s', assuming unavailable", provider)
                 health = ProviderHealth.UNAVAILABLE
-            
+
             # Cache result
             self._health_cache[provider] = health
-            
+
             logger.debug("Provider '%s' health: %s", provider, health.value)
             return health
-            
+
         except Exception as e:
             logger.error("Error checking provider '%s' health: %s", provider, str(e))
             health = ProviderHealth.UNAVAILABLE
@@ -350,7 +350,7 @@ class LLMProviderFactory:
                         return ProviderHealth.HEALTHY
                     else:
                         return ProviderHealth.DEGRADED
-                        
+
         except Exception as e:
             logger.debug("Ollama health check failed: %s", str(e))
             return ProviderHealth.UNAVAILABLE
@@ -370,7 +370,7 @@ class LLMProviderFactory:
                         return ProviderHealth.HEALTHY
                     else:
                         return ProviderHealth.DEGRADED
-                        
+
         except Exception as e:
             logger.debug("vLLM health check failed: %s", str(e))
             return ProviderHealth.UNAVAILABLE
@@ -380,7 +380,7 @@ class LLMProviderFactory:
         self._health_cache.clear()
         logger.debug("Provider health cache cleared")
 
-    async def get_all_provider_health(self) -> Dict[str, ProviderHealth]:
+    async def get_all_provider_health(self) -> dict[str, ProviderHealth]:
         """
         Get health status for all supported providers.
         
@@ -389,8 +389,8 @@ class LLMProviderFactory:
         """
         providers = ["openai", "ollama", "vllm"]
         health_status = {}
-        
+
         for provider in providers:
             health_status[provider] = await self.check_provider_health(provider)
-        
+
         return health_status

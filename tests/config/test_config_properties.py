@@ -7,11 +7,11 @@ properties of the configuration system across all valid inputs.
 """
 
 import json
-from typing import Any, Dict
 
 import pytest
 import yaml
-from hypothesis import HealthCheck, given, settings, strategies as st
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 from voice_agent.config.schema import (
     AuthType,
@@ -27,7 +27,6 @@ from voice_agent.config.schema import (
     TTSProvider,
     VoiceSettings,
 )
-
 
 # Hypothesis strategies for generating valid configuration data
 
@@ -83,7 +82,7 @@ def tool_definition_strategy(draw):
     domain = draw(st.text(min_size=3, max_size=10, alphabet="abcdefghijklmnopqrstuvwxyz"))
     endpoint = f"https://{domain}.example.com/api"
     auth_type = draw(st.sampled_from(list(AuthType)))
-    
+
     # Generate auth-specific fields based on auth_type
     scopes = None
     api_key_name = None
@@ -93,7 +92,7 @@ def tool_definition_strategy(draw):
         api_key_name = draw(st.text(min_size=1, max_size=20, alphabet=st.characters(
             whitelist_categories=("Lu", "Ll", "Nd"), whitelist_characters="-_"
         )))
-    
+
     parameters_schema = draw(st.fixed_dictionaries({
         "type": st.just("object"),
         "properties": st.dictionaries(
@@ -102,7 +101,7 @@ def tool_definition_strategy(draw):
             max_size=3
         )
     }))
-    
+
     return ToolDefinition(
         name=name,
         type=tool_type,
@@ -143,7 +142,7 @@ def tenant_config_strategy(draw):
     num_tools = draw(st.integers(min_value=0, max_value=3))
     tools = []
     tool_names = set()
-    
+
     for _ in range(num_tools):
         tool = draw(tool_definition_strategy())
         # Ensure unique tool names
@@ -151,7 +150,7 @@ def tenant_config_strategy(draw):
             tool = draw(tool_definition_strategy())
         tool_names.add(tool.name)
         tools.append(tool)
-    
+
     return TenantConfig(
         tenant_id=draw(st.text(min_size=1, max_size=30, alphabet="abcdefghijklmnopqrstuvwxyz0123456789_-")),
         persona=draw(persona_config_strategy()),
@@ -186,11 +185,11 @@ class TestConfigurationRoundTrip:
         """
         # Serialize to JSON
         json_str = config.model_dump_json()
-        
+
         # Deserialize from JSON
         config_dict = json.loads(json_str)
         restored_config = TenantConfig.model_validate(config_dict)
-        
+
         # Verify equivalence
         assert restored_config == config
         assert restored_config.model_dump() == config.model_dump()
@@ -208,10 +207,10 @@ class TestConfigurationRoundTrip:
         """
         # Convert to dict
         config_dict = config.model_dump()
-        
+
         # Restore from dict
         restored_config = TenantConfig.model_validate(config_dict)
-        
+
         # Verify equivalence
         assert restored_config == config
         assert restored_config.model_dump() == config.model_dump()
@@ -230,11 +229,11 @@ class TestConfigurationRoundTrip:
         # Serialize to YAML
         config_dict = config.model_dump(mode="json")
         yaml_str = yaml.dump(config_dict, default_flow_style=False)
-        
+
         # Deserialize from YAML
         restored_dict = yaml.safe_load(yaml_str)
         restored_config = TenantConfig.model_validate(restored_dict)
-        
+
         # Verify equivalence
         assert restored_config == config
         assert restored_config.model_dump() == config.model_dump()
@@ -253,18 +252,18 @@ class TestConfigurationRoundTrip:
         # Serialize and deserialize
         config_dict = config.model_dump()
         restored_config = TenantConfig.model_validate(config_dict)
-        
+
         # Verify nested models
         assert restored_config.persona == config.persona
         assert restored_config.llm == config.llm
         assert restored_config.tts == config.tts
         assert restored_config.constraints == config.constraints
-        
+
         # Verify lists of nested models
         assert len(restored_config.tools) == len(config.tools)
         for original_tool, restored_tool in zip(config.tools, restored_config.tools):
             assert restored_tool == original_tool
-        
+
         assert len(restored_config.knowledge_bases) == len(config.knowledge_bases)
         for original_kb, restored_kb in zip(config.knowledge_bases, restored_config.knowledge_bases):
             assert restored_kb == original_kb
@@ -283,12 +282,12 @@ class TestConfigurationRoundTrip:
         # Serialize and deserialize
         config_dict = config.model_dump()
         restored_config = TenantConfig.model_validate(config_dict)
-        
+
         # Verify enum values
         assert restored_config.llm.provider == config.llm.provider
         if config.tts:
             assert restored_config.tts.provider == config.tts.provider
-        
+
         for original_tool, restored_tool in zip(config.tools, restored_config.tools):
             assert restored_tool.type == original_tool.type
             assert restored_tool.auth_type == original_tool.auth_type
@@ -307,13 +306,13 @@ class TestConfigurationRoundTrip:
         # Serialize and deserialize
         config_dict = config.model_dump()
         restored_config = TenantConfig.model_validate(config_dict)
-        
+
         # Verify optional fields
         assert (restored_config.tts is None) == (config.tts is None)
-        
+
         for original_tool, restored_tool in zip(config.tools, restored_config.tools):
             assert (restored_tool.scopes is None) == (original_tool.scopes is None)
             assert (restored_tool.api_key_name is None) == (original_tool.api_key_name is None)
-        
+
         for original_kb, restored_kb in zip(config.knowledge_bases, restored_config.knowledge_bases):
             assert (restored_kb.description is None) == (original_kb.description is None)

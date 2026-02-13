@@ -11,17 +11,16 @@ Supports concurrent processing, barge-in, and streaming optimizations.
 import asyncio
 import logging
 import time
-from typing import Optional, Callable, Dict, Any, List
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from collections import deque
+from typing import Any
 
-from ..services.stt_service import STTService, STTConfig
-from ..services.llm_service import LLMService, LLMResponse, ConversationContext
-from ..services.vad_module import VADModule, VADConfig, VADResult
-from ..services.tts_factory import TTSProviderFactory
 from ..services.elevenlabs_tts_service import VoiceConfig
-
+from ..services.llm_service import ConversationContext, LLMResponse, LLMService
+from ..services.stt_service import STTConfig, STTService
+from ..services.tts_factory import TTSProviderFactory
+from ..services.vad_module import VADConfig, VADModule
 
 logger = logging.getLogger(__name__)
 
@@ -52,9 +51,9 @@ class LatencyMetrics:
     tts_ttfb_ms: float = 0.0  # Time To First Byte
     tts_total_ms: float = 0.0
     end_to_end_ms: float = 0.0
-    tool_execution_ms: Optional[float] = None
-    
-    def to_dict(self) -> Dict[str, float]:
+    tool_execution_ms: float | None = None
+
+    def to_dict(self) -> dict[str, float]:
         """Convert metrics to dictionary."""
         return {
             "stt_latency_ms": self.stt_latency_ms,
@@ -109,11 +108,11 @@ class PipelineConfig:
     llm_service: LLMService
     vad_config: VADConfig
     voice_config: VoiceConfig
-    tts_provider_config: Optional[Dict[str, Any]] = None
+    tts_provider_config: dict[str, Any] | None = None
     enable_barge_in: bool = True
     enable_interim_processing: bool = False
     buffer_size: int = 8192
-    streaming_config: Optional[StreamingConfig] = None
+    streaming_config: StreamingConfig | None = None
 
 
 class VoicePipeline:
@@ -138,41 +137,41 @@ class VoicePipeline:
         """
         self.config = config
         self._state = PipelineState.IDLE
-        
+
         # Streaming configuration
         self._streaming_config = config.streaming_config or StreamingConfig()
-        
+
         # Initialize components
         self._stt_service = STTService(config.stt_config)
         self._llm_service = config.llm_service
         self._vad_module = VADModule(config.vad_config)
         self._tts_factory = TTSProviderFactory()
         self._tts_service = None
-        
+
         # Conversation context
         self._context = ConversationContext(
             session_id=config.session_id,
             conversation_history=[],
             extracted_parameters={},
         )
-        
+
         # Callback handlers
-        self._transcript_callback: Optional[Callable[[str, bool], None]] = None
-        self._llm_response_callback: Optional[Callable[[LLMResponse], None]] = None
-        self._audio_generated_callback: Optional[Callable[[bytes], None]] = None
-        self._latency_callback: Optional[Callable[[LatencyMetrics], None]] = None
-        
+        self._transcript_callback: Callable[[str, bool], None] | None = None
+        self._llm_response_callback: Callable[[LLMResponse], None] | None = None
+        self._audio_generated_callback: Callable[[bytes], None] | None = None
+        self._latency_callback: Callable[[LatencyMetrics], None] | None = None
+
         # Barge-in state
         self._barge_in_enabled = config.enable_barge_in
         self._is_agent_speaking = False
-        self._current_tts_task: Optional[asyncio.Task] = None
-        
+        self._current_tts_task: asyncio.Task | None = None
+
         # Audio buffer for processing with flow control
         self._audio_buffer = bytearray()
         self._audio_queue: asyncio.Queue = asyncio.Queue(
             maxsize=self._streaming_config.audio_queue_max_size
         )
-        
+
         # Processing locks and semaphores for concurrent control
         self._processing_lock = asyncio.Lock()
         self._llm_semaphore = asyncio.Semaphore(
@@ -181,14 +180,14 @@ class VoicePipeline:
         self._tts_semaphore = asyncio.Semaphore(
             self._streaming_config.max_concurrent_tts_requests
         )
-        
+
         # Latency tracking
         self._current_metrics = LatencyMetrics()
-        self._stage_timers: Dict[str, float] = {}
-        
+        self._stage_timers: dict[str, float] = {}
+
         # Concurrent processing tasks
-        self._processing_tasks: List[asyncio.Task] = []
-        
+        self._processing_tasks: list[asyncio.Task] = []
+
         logger.info(
             "Voice pipeline initialized (session: %s, barge_in: %s, concurrent: %s)",
             config.session_id,
@@ -221,31 +220,31 @@ class VoicePipeline:
         if self._state != PipelineState.IDLE:
             logger.warning("Pipeline already initialized")
             return
-        
+
         self._state = PipelineState.INITIALIZING
-        
+
         try:
             # Connect STT service
             await self._stt_service.connect(self.config.session_id)
-            
+
             # Register STT callbacks
             self._stt_service.on_interim_result(self._handle_interim_transcript)
             self._stt_service.on_final_result(self._handle_final_transcript)
             self._stt_service.on_error(self._handle_stt_error)
-            
+
             # Register VAD callbacks
             self._vad_module.on_speech_start(self._handle_speech_start)
             self._vad_module.on_speech_end(self._handle_speech_end)
-            
+
             # Initialize TTS service
             self._tts_service = await self._tts_factory.create_tts_service(
                 voice_config=self.config.voice_config,
                 provider_config=self.config.tts_provider_config,
             )
-            
+
             self._state = PipelineState.ACTIVE
             logger.info("Voice pipeline initialized successfully")
-            
+
         except Exception as e:
             self._state = PipelineState.ERROR
             logger.error("Failed to initialize pipeline: %s", str(e))
@@ -258,21 +257,21 @@ class VoicePipeline:
         if self._state == PipelineState.IDLE:
             logger.debug("Pipeline already shutdown")
             return
-        
+
         self._state = PipelineState.STOPPING
-        
+
         try:
             # Cancel any ongoing processing tasks
             for task in self._processing_tasks:
                 if not task.done():
                     task.cancel()
-            
+
             # Wait for all tasks to complete
             if self._processing_tasks:
                 await asyncio.gather(*self._processing_tasks, return_exceptions=True)
-            
+
             self._processing_tasks.clear()
-            
+
             # Cancel any ongoing TTS
             if self._current_tts_task and not self._current_tts_task.done():
                 self._current_tts_task.cancel()
@@ -280,27 +279,27 @@ class VoicePipeline:
                     await self._current_tts_task
                 except asyncio.CancelledError:
                     pass
-            
+
             # Disconnect STT service
             if self._stt_service.is_connected:
                 await self._stt_service.disconnect()
-            
+
             # Reset VAD
             self._vad_module.reset()
-            
+
             # Clear buffers
             self._audio_buffer.clear()
-            
+
             # Clear audio queue
             while not self._audio_queue.empty():
                 try:
                     self._audio_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
-            
+
             self._state = PipelineState.IDLE
             logger.info("Voice pipeline shutdown complete")
-            
+
         except Exception as e:
             logger.error("Error during pipeline shutdown: %s", str(e))
             self._state = PipelineState.ERROR
@@ -381,7 +380,7 @@ class VoicePipeline:
         if stage not in self._stage_timers:
             logger.warning("No timer found for stage: %s", stage)
             return 0.0
-        
+
         start_time = self._stage_timers.pop(stage)
         duration_ms = (time.perf_counter() - start_time) * 1000
         logger.debug("Stage %s completed in %.2f ms", stage, duration_ms)
@@ -407,7 +406,7 @@ class VoicePipeline:
             self._current_metrics.tts_total_ms = duration_ms
         elif stage == "end_to_end":
             self._current_metrics.end_to_end_ms = duration_ms
-        
+
         logger.debug("Recorded latency for %s: %.2f ms", stage, duration_ms)
 
     def get_latency_metrics(self) -> LatencyMetrics:
@@ -428,7 +427,7 @@ class VoicePipeline:
         """
         if self._audio_queue.maxsize == 0:
             return False
-        
+
         queue_utilization = self._audio_queue.qsize() / self._audio_queue.maxsize
         return queue_utilization >= self._streaming_config.backpressure_threshold
 
@@ -449,51 +448,51 @@ class VoicePipeline:
         """
         if self._state != PipelineState.ACTIVE:
             raise RuntimeError(f"Pipeline not active (state: {self._state.value})")
-        
+
         if not audio_data:
             raise ValueError("Audio data cannot be empty")
-        
+
         try:
             # Check for backpressure
             if self._check_backpressure():
                 logger.warning("Audio queue backpressure detected, applying flow control")
                 # Could implement adaptive buffering here
                 await asyncio.sleep(0.01)  # Brief pause to allow queue to drain
-            
+
             # Add to buffer
             self._audio_buffer.extend(audio_data)
-            
+
             # Process buffer in chunks
             while len(self._audio_buffer) >= self._streaming_config.audio_chunk_size:
                 chunk = bytes(self._audio_buffer[:self._streaming_config.audio_chunk_size])
                 del self._audio_buffer[:self._streaming_config.audio_chunk_size]
-                
+
                 # Process through VAD for speech detection
                 vad_result = self._vad_module.process_audio(chunk)
-                
+
                 # Check for barge-in
                 if self._barge_in_enabled and vad_result.is_speech and self._is_agent_speaking:
                     logger.info("Barge-in detected, interrupting agent speech")
                     await self._handle_barge_in()
-                
+
                 # Send audio to STT service
                 if self._stt_service.is_connected:
                     await self._stt_service.send_audio(chunk)
-            
+
             # Enforce max buffer size
             if len(self._audio_buffer) > self._streaming_config.max_audio_buffer_size:
                 logger.warning("Audio buffer overflow, discarding oldest data")
                 excess = len(self._audio_buffer) - self._streaming_config.max_audio_buffer_size
                 del self._audio_buffer[:excess]
-            
-            logger.debug("Processed audio chunk: %d bytes (buffer: %d bytes)", 
+
+            logger.debug("Processed audio chunk: %d bytes (buffer: %d bytes)",
                         len(audio_data), len(self._audio_buffer))
-            
+
         except Exception as e:
             logger.error("Error processing audio chunk: %s", str(e))
             raise
 
-    async def _handle_interim_transcript(self, transcript: str, metadata: Dict[str, Any]) -> None:
+    async def _handle_interim_transcript(self, transcript: str, metadata: dict[str, Any]) -> None:
         """
         Handle interim transcript from STT service.
         
@@ -502,21 +501,21 @@ class VoicePipeline:
             metadata: Transcript metadata
         """
         logger.debug("Interim transcript: %s", transcript)
-        
+
         # Notify callback
         if self._transcript_callback:
             self._transcript_callback(transcript, False)
-        
+
         # Process interim results if enabled for early LLM start
-        if (self.config.enable_interim_processing and 
-            self._streaming_config.enable_early_llm_start and 
+        if (self.config.enable_interim_processing and
+            self._streaming_config.enable_early_llm_start and
             transcript.strip()):
             # Start LLM processing early for lower latency
             # This is experimental and may result in incomplete context
             logger.debug("Early LLM start enabled, processing interim transcript")
             # Could trigger early LLM processing here
 
-    async def _handle_final_transcript(self, transcript: str, metadata: Dict[str, Any]) -> None:
+    async def _handle_final_transcript(self, transcript: str, metadata: dict[str, Any]) -> None:
         """
         Handle final transcript from STT service.
         
@@ -531,18 +530,18 @@ class VoicePipeline:
         if "stt" in self._stage_timers:
             stt_latency = self._end_latency_timer("stt")
             self._record_latency("stt", stt_latency)
-        
+
         logger.info("Final transcript: %s (confidence: %.2f)", transcript, metadata.get("confidence", 0.0))
-        
+
         # Notify callback
         if self._transcript_callback:
             self._transcript_callback(transcript, True)
-        
+
         # Process through LLM
         if transcript.strip():
             # Start end-to-end timer
             self._start_latency_timer("end_to_end")
-            
+
             # Process LLM concurrently if enabled
             if self._streaming_config.enable_concurrent_processing:
                 task = asyncio.create_task(self._process_llm(transcript))
@@ -568,48 +567,48 @@ class VoicePipeline:
                         "role": "user",
                         "content": transcript,
                     })
-                    
+
                     # Start LLM timer
                     self._start_latency_timer("llm_total")
                     self._start_latency_timer("llm_ttft")
-                    
+
                     # Generate LLM response
                     logger.debug("Generating LLM response for: %s", transcript)
                     llm_response = await self._llm_service.generate_response(
                         transcript=transcript,
                         context=self._context,
                     )
-                    
+
                     # Record TTFT (approximation - actual TTFT would need streaming support)
                     llm_ttft = self._end_latency_timer("llm_ttft")
                     self._record_latency("llm_ttft", llm_ttft)
-                    
+
                     logger.info("LLM response generated: %s", llm_response.text[:100])
-                    
+
                     # Record total LLM time
                     llm_total = self._end_latency_timer("llm_total")
                     self._record_latency("llm_total", llm_total)
-                    
+
                     # Update context with extracted parameters
                     self._context.extracted_parameters.update(llm_response.parameters)
-                    
+
                     # Add assistant turn to context
                     self._context.conversation_history.append({
                         "role": "assistant",
                         "content": llm_response.text,
                     })
-                    
+
                     # Notify callback
                     if self._llm_response_callback:
                         self._llm_response_callback(llm_response)
-                    
+
                     # Generate audio response (concurrent if enabled)
                     if self._streaming_config.enable_concurrent_processing:
                         task = asyncio.create_task(self._generate_audio(llm_response))
                         self._processing_tasks.append(task)
                     else:
                         await self._generate_audio(llm_response)
-                    
+
                 except Exception as e:
                     logger.error("Error processing LLM: %s", str(e))
                     # Clean up timers
@@ -630,7 +629,7 @@ class VoicePipeline:
         if not self._tts_service:
             logger.error("TTS service not initialized")
             return
-        
+
         async with self._tts_semaphore:
             try:
                 # Apply emotional context if available
@@ -640,38 +639,38 @@ class VoicePipeline:
                         text,
                         llm_response.emotional_tags,
                     )
-                
+
                 # Mark agent as speaking
                 self._is_agent_speaking = True
-                
+
                 # Start TTS timer
                 self._start_latency_timer("tts_total")
                 self._start_latency_timer("tts_ttfb")
-                
+
                 # Create TTS task
                 self._current_tts_task = asyncio.create_task(
                     self._stream_tts_audio(text)
                 )
-                
+
                 # Wait for TTS to complete
                 await self._current_tts_task
-                
+
                 # Record total TTS time
                 tts_total = self._end_latency_timer("tts_total")
                 self._record_latency("tts_total", tts_total)
-                
+
                 # Record end-to-end latency
                 if "end_to_end" in self._stage_timers:
                     e2e_latency = self._end_latency_timer("end_to_end")
                     self._record_latency("end_to_end", e2e_latency)
-                    
+
                     # Notify latency callback
                     if self._latency_callback:
                         self._latency_callback(self._current_metrics)
-                    
+
                     # Log metrics
                     logger.info("Pipeline metrics: %s", self._current_metrics.to_dict())
-                
+
             except asyncio.CancelledError:
                 logger.info("TTS generation cancelled (barge-in)")
                 # Clean up timers
@@ -697,7 +696,7 @@ class VoicePipeline:
             text: Text to synthesize
         """
         first_chunk = True
-        
+
         try:
             async for audio_chunk in self._tts_service.synthesize_streaming(text):
                 # Record TTFB on first chunk
@@ -705,13 +704,13 @@ class VoicePipeline:
                     tts_ttfb = self._end_latency_timer("tts_ttfb")
                     self._record_latency("tts_ttfb", tts_ttfb)
                     first_chunk = False
-                
+
                 # Notify callback with audio chunk
                 if self._audio_generated_callback:
                     self._audio_generated_callback(audio_chunk)
-                
+
                 logger.debug("Generated audio chunk: %d bytes", len(audio_chunk))
-                
+
         except Exception as e:
             logger.error("Error streaming TTS audio: %s", str(e))
             raise
@@ -733,7 +732,7 @@ class VoicePipeline:
             timestamp: Timestamp when speech started
         """
         logger.debug("Speech started at %.3f", timestamp)
-        
+
         # Could trigger barge-in here if agent is speaking
         if self._barge_in_enabled and self._is_agent_speaking:
             asyncio.create_task(self._handle_barge_in())

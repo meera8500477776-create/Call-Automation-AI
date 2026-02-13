@@ -1,7 +1,7 @@
 """Configuration validation using Pydantic schemas."""
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -15,8 +15,8 @@ class ValidationResult:
     def __init__(
         self,
         is_valid: bool,
-        errors: Optional[List[str]] = None,
-        config: Optional[TenantConfig] = None,
+        errors: list[str] | None = None,
+        config: TenantConfig | None = None,
     ):
         """Initialize validation result.
 
@@ -44,7 +44,7 @@ class ConfigValidator:
     """Validates tenant configuration files against schema."""
 
     @staticmethod
-    def validate_dict(config_dict: Dict[str, Any]) -> ValidationResult:
+    def validate_dict(config_dict: dict[str, Any]) -> ValidationResult:
         """Validate configuration dictionary against schema.
 
         Args:

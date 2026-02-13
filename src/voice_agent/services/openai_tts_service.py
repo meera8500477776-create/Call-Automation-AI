@@ -9,13 +9,12 @@ fallback TTS provider.
 """
 
 import logging
-from typing import AsyncIterator, Optional, List
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from openai import AsyncOpenAI
 
 from .elevenlabs_tts_service import VoiceConfig, VoiceSettings
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +64,7 @@ class OpenAITTSService:
         """
         self.config = config
         self.client = AsyncOpenAI(api_key=config.api_key)
-        
+
         logger.info(
             "OpenAI TTS service initialized (voice: %s, model: %s)",
             config.default_voice_config.voice_id,
@@ -75,7 +74,7 @@ class OpenAITTSService:
     async def synthesize_streaming(
         self,
         text: str,
-        voice_config: Optional[VoiceConfig] = None,
+        voice_config: VoiceConfig | None = None,
     ) -> AsyncIterator[bytes]:
         """
         Synthesize text to speech with streaming output.
@@ -96,15 +95,15 @@ class OpenAITTSService:
         """
         if not text or not text.strip():
             raise ValueError("Text cannot be empty")
-        
+
         config = voice_config or self.config.default_voice_config
-        
+
         if config.provider != "openai":
             raise ValueError(f"OpenAI service requires provider='openai', got '{config.provider}'")
-        
+
         # Map voice_id to OpenAI voice name
         voice_name = self._get_openai_voice(config.voice_id)
-        
+
         try:
             logger.info(
                 "Starting streaming synthesis (voice: %s, model: %s, length: %d chars)",
@@ -112,7 +111,7 @@ class OpenAITTSService:
                 self.config.model,
                 len(text),
             )
-            
+
             # Stream audio generation
             response = await self.client.audio.speech.create(
                 model=self.config.model,
@@ -120,23 +119,23 @@ class OpenAITTSService:
                 input=text,
                 response_format="mp3",
             )
-            
+
             # Stream audio chunks
             chunk_count = 0
             total_bytes = 0
-            
+
             async for chunk in response.iter_bytes(chunk_size=self.config.chunk_size):
                 if chunk:
                     chunk_count += 1
                     total_bytes += len(chunk)
                     yield chunk
-            
+
             logger.info(
                 "Streaming synthesis complete (chunks: %d, total bytes: %d)",
                 chunk_count,
                 total_bytes,
             )
-            
+
         except Exception as e:
             logger.error("Failed to synthesize speech: %s", str(e))
             raise RuntimeError(f"Speech synthesis failed: {str(e)}") from e
@@ -157,7 +156,7 @@ class OpenAITTSService:
         # Check if it's a direct OpenAI voice name
         if voice_id in self.VOICE_MAPPING:
             return self.VOICE_MAPPING[voice_id]
-        
+
         # Default to "alloy" if not found
         logger.warning(
             "Voice '%s' not found in OpenAI voices, defaulting to 'alloy'",
@@ -165,7 +164,7 @@ class OpenAITTSService:
         )
         return "alloy"
 
-    def apply_emotional_context(self, text: str, tags: List[str]) -> str:
+    def apply_emotional_context(self, text: str, tags: list[str]) -> str:
         """
         Apply emotional context to text.
         
@@ -188,9 +187,9 @@ class OpenAITTSService:
 
     async def clone_voice(
         self,
-        audio_samples: List[bytes],
+        audio_samples: list[bytes],
         voice_name: str,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> str:
         """
         Clone a voice from audio samples.
@@ -231,7 +230,7 @@ class OpenAITTSService:
             "OpenAI TTS does not have configurable voice settings, returning defaults for: %s",
             voice_id,
         )
-        
+
         # Return default settings for consistency
         return VoiceSettings(
             stability=0.5,
@@ -240,7 +239,7 @@ class OpenAITTSService:
             use_speaker_boost=False,
         )
 
-    async def list_available_voices(self) -> List[dict]:
+    async def list_available_voices(self) -> list[dict]:
         """
         List all available voices from OpenAI.
         
@@ -248,7 +247,7 @@ class OpenAITTSService:
             List of voice information dictionaries
         """
         logger.info("Listing available OpenAI voices")
-        
+
         voices = [
             {
                 "voice_id": "alloy",
@@ -293,7 +292,7 @@ class OpenAITTSService:
                 "labels": {},
             },
         ]
-        
+
         logger.info("Retrieved %d available voices", len(voices))
-        
+
         return voices

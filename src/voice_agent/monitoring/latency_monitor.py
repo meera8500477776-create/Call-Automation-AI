@@ -2,8 +2,7 @@
 
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import dataclass
 
 from voice_agent.monitoring.logger import get_logger
 
@@ -20,7 +19,7 @@ class LatencyMetrics:
     tts_ttfb_ms: float = 0.0  # Time To First Byte
     tts_total_ms: float = 0.0
     end_to_end_ms: float = 0.0
-    tool_execution_ms: Optional[float] = None
+    tool_execution_ms: float | None = None
 
 
 @dataclass
@@ -60,13 +59,13 @@ class LatencyMonitor:
     def __init__(self) -> None:
         """Initialize the latency monitor."""
         # Active timers: {session_id: {stage: start_time}}
-        self._timers: Dict[str, Dict[str, float]] = defaultdict(dict)
+        self._timers: dict[str, dict[str, float]] = defaultdict(dict)
 
         # Session metrics: {session_id: LatencyMetrics}
-        self._session_metrics: Dict[str, LatencyMetrics] = {}
+        self._session_metrics: dict[str, LatencyMetrics] = {}
 
         # Historical latency data: {stage: [durations]}
-        self._latency_history: Dict[str, List[float]] = defaultdict(list)
+        self._latency_history: dict[str, list[float]] = defaultdict(list)
 
     def start_timer(self, session_id: str, stage: str) -> None:
         """Start a timer for a specific pipeline stage.
@@ -160,7 +159,7 @@ class LatencyMonitor:
             duration_ms=duration_ms,
         )
 
-    def get_session_metrics(self, session_id: str) -> Optional[LatencyMetrics]:
+    def get_session_metrics(self, session_id: str) -> LatencyMetrics | None:
         """Get latency metrics for a specific session.
 
         Args:
@@ -172,8 +171,8 @@ class LatencyMonitor:
         return self._session_metrics.get(session_id)
 
     def get_aggregate_metrics(
-        self, stage: Optional[str] = None
-    ) -> Dict[str, AggregateMetrics]:
+        self, stage: str | None = None
+    ) -> dict[str, AggregateMetrics]:
         """Get aggregate latency metrics across all sessions.
 
         Args:
@@ -261,7 +260,7 @@ class LatencyMonitor:
             )
 
     @staticmethod
-    def _percentile(sorted_values: List[float], percentile: int) -> float:
+    def _percentile(sorted_values: list[float], percentile: int) -> float:
         """Calculate percentile from sorted values.
 
         Args:

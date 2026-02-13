@@ -4,8 +4,10 @@
 """
 
 import time
-from hypothesis import given, strategies as st, settings
+
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from voice_agent.monitoring.latency_monitor import LatencyMonitor
 

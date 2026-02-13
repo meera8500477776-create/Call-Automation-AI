@@ -9,18 +9,17 @@ and handles call routing and session lifecycle management.
 """
 
 import logging
-from typing import Dict, Optional, Any
 from dataclasses import dataclass
+from typing import Any
 
 from ..config.registry import TenantRegistry
 from ..config.schema import TenantConfig
-from .session_manager import SessionManager
-from .voice_pipeline import VoicePipeline, PipelineConfig, StreamingConfig
+from ..services.elevenlabs_tts_service import VoiceConfig
 from ..services.llm_factory import LLMProviderFactory
 from ..services.stt_service import STTConfig
 from ..services.vad_module import VADConfig
-from ..services.elevenlabs_tts_service import VoiceConfig
-
+from .session_manager import SessionManager
+from .voice_pipeline import PipelineConfig, StreamingConfig, VoicePipeline
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +29,9 @@ class CallMetadata:
     """Metadata for an incoming call."""
     caller_id: str
     call_sid: str
-    from_number: Optional[str] = None
-    to_number: Optional[str] = None
-    additional_data: Optional[Dict[str, Any]] = None
+    from_number: str | None = None
+    to_number: str | None = None
+    additional_data: dict[str, Any] | None = None
 
 
 class PipecatOrchestrator:
@@ -45,13 +44,13 @@ class PipecatOrchestrator:
     def __init__(
         self,
         tenant_registry: TenantRegistry,
-        session_manager: Optional[SessionManager] = None,
+        session_manager: SessionManager | None = None,
     ):
         """Initialize the Pipecat Orchestrator."""
         self._tenant_registry = tenant_registry
         self._session_manager = session_manager or SessionManager()
         self._llm_factory = LLMProviderFactory()
-        self._active_pipelines: Dict[str, VoicePipeline] = {}
+        self._active_pipelines: dict[str, VoicePipeline] = {}
         logger.info("Pipecat Orchestrator initialized")
 
     def route_call(self, caller_id: str, call_metadata: CallMetadata) -> TenantConfig:
@@ -69,25 +68,25 @@ class PipecatOrchestrator:
     ) -> VoicePipeline:
         """Initialize voice pipeline from tenant configuration."""
         logger.info("Initializing pipeline for session=%s, tenant=%s", session_id, tenant_config.tenant_id)
-        
+
         # Create LLM service
         llm_service = await self._llm_factory.create_llm_service(tenant_config.llm)
-        
+
         # Build STT configuration
         stt_config = self._build_stt_config(tenant_config)
-        
+
         # Build VAD configuration
         vad_config = self._build_vad_config(tenant_config)
-        
+
         # Build voice configuration
         voice_config = self._build_voice_config(tenant_config)
-        
+
         # Build streaming configuration
         streaming_config = StreamingConfig(
             enable_concurrent_processing=True,
             enable_early_llm_start=False,
         )
-        
+
         # Create pipeline configuration
         pipeline_config = PipelineConfig(
             session_id=session_id,
@@ -99,7 +98,7 @@ class PipecatOrchestrator:
             enable_interim_processing=False,
             streaming_config=streaming_config,
         )
-        
+
         # Create and return pipeline
         pipeline = VoicePipeline(pipeline_config)
         logger.info("Pipeline initialized for session: %s", session_id)
@@ -107,12 +106,13 @@ class PipecatOrchestrator:
 
     def _build_stt_config(self, tenant_config: TenantConfig) -> STTConfig:
         """Build STT configuration from tenant config."""
+        stt = getattr(tenant_config, 'stt', None)
         return STTConfig(
-            api_key=getattr(tenant_config.stt, 'api_key', None) or "",
-            model=getattr(tenant_config.stt, 'model', "nova-2"),
-            language=getattr(tenant_config.stt, 'language', "en-US"),
-            interim_results=getattr(tenant_config.stt, 'interim_results', True),
-            punctuate=getattr(tenant_config.stt, 'punctuate', True),
+            api_key=getattr(stt, 'api_key', None) or "" if stt else "",
+            model=getattr(stt, 'model', "nova-2") if stt else "nova-2",
+            language=getattr(stt, 'language', "en-US") if stt else "en-US",
+            interim_results=getattr(stt, 'interim_results', True) if stt else True,
+            punctuate=getattr(stt, 'punctuate', True) if stt else True,
         )
 
     def _build_vad_config(self, tenant_config: TenantConfig) -> VADConfig:
@@ -161,11 +161,11 @@ class PipecatOrchestrator:
         **Validates: Requirements 1.3, 1.4, 11.5**
         """
         logger.info("Starting session: %s for caller: %s", session_id, caller_id)
-        
+
         try:
             # Route call to tenant
             tenant_config = self.route_call(caller_id, call_metadata)
-            
+
             # Create session
             session = self._session_manager.create_session(
                 tenant_id=tenant_config.tenant_id,
@@ -179,19 +179,19 @@ class PipecatOrchestrator:
                 },
             )
             logger.info("Created session: %s for tenant: %s", session_id, tenant_config.tenant_id)
-            
+
             # Initialize pipeline
             pipeline = await self.initialize_pipeline(session_id, tenant_config)
-            
+
             # Initialize pipeline components
             await pipeline.initialize()
-            
+
             # Store active pipeline
             self._active_pipelines[session_id] = pipeline
-            
+
             logger.info("Session started successfully: %s", session_id)
             return pipeline
-            
+
         except Exception as e:
             logger.error("Failed to start session %s: %s", session_id, str(e))
             # Cleanup on failure
@@ -202,7 +202,7 @@ class PipecatOrchestrator:
         self,
         session_id: str,
         persist: bool = True,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Stop a voice session and cleanup resources.
         
@@ -218,10 +218,10 @@ class PipecatOrchestrator:
         **Validates: Requirements 11.5, 11.6**
         """
         logger.info("Stopping session: %s (persist=%s)", session_id, persist)
-        
+
         # Get pipeline
         pipeline = self._active_pipelines.get(session_id)
-        
+
         if pipeline:
             try:
                 # Shutdown pipeline
@@ -234,20 +234,20 @@ class PipecatOrchestrator:
                 del self._active_pipelines[session_id]
         else:
             logger.warning("No active pipeline found for session: %s", session_id)
-        
+
         # Cleanup session
         summary = self._session_manager.cleanup_session(session_id, persist=persist)
-        
+
         if summary:
-            logger.info("Session stopped: %s (duration: %.2fs)", 
-                       session_id, 
+            logger.info("Session stopped: %s (duration: %.2fs)",
+                       session_id,
                        summary.get("duration_seconds", 0))
         else:
             logger.warning("Session not found: %s", session_id)
-        
+
         return summary
 
-    def get_active_pipeline(self, session_id: str) -> Optional[VoicePipeline]:
+    def get_active_pipeline(self, session_id: str) -> VoicePipeline | None:
         """
         Get active pipeline for a session.
         

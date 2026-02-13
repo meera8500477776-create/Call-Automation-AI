@@ -1,7 +1,7 @@
 """Session and conversation data models."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -30,19 +30,19 @@ class ConversationTurn(BaseModel):
         ...,
         description="Transcribed or generated text for this turn"
     )
-    intent: Optional[str] = Field(
+    intent: str | None = Field(
         default=None,
         description="Classified intent name (e.g., 'schedule_appointment')"
     )
-    parameters: Dict[str, Any] = Field(
+    parameters: dict[str, Any] = Field(
         default_factory=dict,
         description="Extracted parameters from the utterance"
     )
-    tool_calls: List[str] = Field(
+    tool_calls: list[str] = Field(
         default_factory=list,
         description="List of tool names called during this turn"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional metadata (latency metrics, confidence scores, etc.)"
     )
@@ -73,19 +73,19 @@ class Session(BaseModel):
         default_factory=datetime.utcnow,
         description="When the session started"
     )
-    end_time: Optional[datetime] = Field(
+    end_time: datetime | None = Field(
         default=None,
         description="When the session ended (None if still active)"
     )
-    conversation_history: List[ConversationTurn] = Field(
+    conversation_history: list[ConversationTurn] = Field(
         default_factory=list,
         description="Ordered list of conversation turns"
     )
-    extracted_parameters: Dict[str, Any] = Field(
+    extracted_parameters: dict[str, Any] = Field(
         default_factory=dict,
         description="Parameters extracted and accumulated across turns"
     )
-    current_intent: Optional[str] = Field(
+    current_intent: str | None = Field(
         default=None,
         description="Current active intent being processed"
     )
@@ -93,7 +93,7 @@ class Session(BaseModel):
         default="initial",
         description="Current stage in the conversation workflow"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional session metadata (call_sid, transfer_reason, etc.)"
     )
@@ -107,11 +107,11 @@ class Session(BaseModel):
             turn: The conversation turn to add
         """
         self.conversation_history.append(turn)
-        
+
         # Update current intent if the turn has one
         if turn.intent:
             self.current_intent = turn.intent
-        
+
         # Merge turn parameters into session parameters
         if turn.parameters:
             self.extracted_parameters.update(turn.parameters)
@@ -137,7 +137,7 @@ class Session(BaseModel):
         """
         return len(self.conversation_history)
 
-    def get_last_turn(self) -> Optional[ConversationTurn]:
+    def get_last_turn(self) -> ConversationTurn | None:
         """Get the most recent conversation turn.
         
         Returns:

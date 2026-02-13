@@ -9,17 +9,17 @@ failover logic (ElevenLabs → OpenAI) for high availability.
 """
 
 import logging
-import aiohttp
-from typing import Optional, Dict, Any, Union
 from enum import Enum
+from typing import Any
+
+import aiohttp
 
 from .elevenlabs_tts_service import (
     ElevenLabsTTSService,
     TTSConfig,
     VoiceConfig,
 )
-from .openai_tts_service import OpenAITTSService, OpenAITTSConfig
-
+from .openai_tts_service import OpenAITTSConfig, OpenAITTSService
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ class TTSProviderFactory:
 
     def __init__(
         self,
-        elevenlabs_api_key: Optional[str] = None,
-        openai_api_key: Optional[str] = None,
+        elevenlabs_api_key: str | None = None,
+        openai_api_key: str | None = None,
         enable_failover: bool = True,
     ):
         """
@@ -57,10 +57,10 @@ class TTSProviderFactory:
         self.elevenlabs_api_key = elevenlabs_api_key
         self.openai_api_key = openai_api_key
         self.enable_failover = enable_failover
-        
+
         # Cache for provider health status
-        self._health_cache: Dict[str, ProviderHealth] = {}
-        
+        self._health_cache: dict[str, ProviderHealth] = {}
+
         logger.info(
             "TTS provider factory initialized (failover: %s)",
             "enabled" if enable_failover else "disabled",
@@ -69,8 +69,8 @@ class TTSProviderFactory:
     async def create_tts_service(
         self,
         voice_config: VoiceConfig,
-        provider_config: Optional[Dict[str, Any]] = None,
-    ) -> Union[ElevenLabsTTSService, OpenAITTSService]:
+        provider_config: dict[str, Any] | None = None,
+    ) -> ElevenLabsTTSService | OpenAITTSService:
         """
         Create TTS service instance based on configuration.
         
@@ -91,17 +91,17 @@ class TTSProviderFactory:
             RuntimeError: If provider creation fails and no fallback available
         """
         provider_config = provider_config or {}
-        
+
         # Check provider health
         health = await self.check_provider_health(voice_config.provider)
-        
+
         if health == ProviderHealth.UNAVAILABLE and self.enable_failover:
             logger.warning(
                 "Primary provider '%s' is unavailable, attempting failover",
                 voice_config.provider,
             )
             return await self._create_with_failover(voice_config, provider_config)
-        
+
         # Create primary provider
         try:
             service = await self._create_provider(voice_config, provider_config)
@@ -110,10 +110,10 @@ class TTSProviderFactory:
                 voice_config.provider,
             )
             return service
-            
+
         except Exception as e:
             logger.error("Failed to create provider '%s': %s", voice_config.provider, str(e))
-            
+
             if self.enable_failover and voice_config.provider == "elevenlabs":
                 logger.info("Attempting failover after provider creation failure")
                 return await self._create_with_failover(voice_config, provider_config)
@@ -125,8 +125,8 @@ class TTSProviderFactory:
     async def _create_provider(
         self,
         voice_config: VoiceConfig,
-        provider_config: Dict[str, Any],
-    ) -> Union[ElevenLabsTTSService, OpenAITTSService]:
+        provider_config: dict[str, Any],
+    ) -> ElevenLabsTTSService | OpenAITTSService:
         """
         Create provider instance without failover logic.
         
@@ -141,7 +141,7 @@ class TTSProviderFactory:
             ValueError: If provider is not supported
         """
         provider = voice_config.provider.lower()
-        
+
         if provider == "elevenlabs":
             tts_config = TTSConfig(
                 api_key=provider_config.get("api_key", self.elevenlabs_api_key),
@@ -151,7 +151,7 @@ class TTSProviderFactory:
                 output_format=provider_config.get("output_format", "mp3_44100_128"),
             )
             return ElevenLabsTTSService(config=tts_config)
-        
+
         elif provider == "openai":
             openai_config = OpenAITTSConfig(
                 api_key=provider_config.get("api_key", self.openai_api_key),
@@ -160,15 +160,15 @@ class TTSProviderFactory:
                 chunk_size=provider_config.get("chunk_size", 4096),
             )
             return OpenAITTSService(config=openai_config)
-        
+
         else:
             raise ValueError(f"Unsupported TTS provider: {provider}")
 
     async def _create_with_failover(
         self,
         voice_config: VoiceConfig,
-        provider_config: Dict[str, Any],
-    ) -> Union[ElevenLabsTTSService, OpenAITTSService]:
+        provider_config: dict[str, Any],
+    ) -> ElevenLabsTTSService | OpenAITTSService:
         """
         Create service with automatic failover to OpenAI.
         
@@ -185,12 +185,12 @@ class TTSProviderFactory:
             RuntimeError: If all providers fail
         """
         primary_provider = voice_config.provider.lower()
-        
+
         # Only ElevenLabs has failover to OpenAI
         if primary_provider == "elevenlabs":
             try:
                 logger.info("Attempting OpenAI fallback for ElevenLabs")
-                
+
                 # Create fallback voice config with OpenAI provider
                 fallback_voice_config = VoiceConfig(
                     provider="openai",
@@ -201,15 +201,15 @@ class TTSProviderFactory:
                     style=voice_config.style,
                     use_speaker_boost=voice_config.use_speaker_boost,
                 )
-                
+
                 return await self._create_provider(fallback_voice_config, provider_config)
-                
+
             except Exception as e:
                 logger.error("OpenAI fallback also failed: %s", str(e))
                 raise RuntimeError(
                     "All TTS providers failed. Primary: ElevenLabs, Fallback: OpenAI"
                 ) from e
-        
+
         else:
             # OpenAI has no fallback
             raise RuntimeError(
@@ -231,30 +231,30 @@ class TTSProviderFactory:
             Provider health status
         """
         provider = provider.lower()
-        
+
         # Return cached health if available
         if provider in self._health_cache:
             return self._health_cache[provider]
-        
+
         try:
             if provider == "elevenlabs":
                 health = await self._check_elevenlabs_health()
-            
+
             elif provider == "openai":
                 # OpenAI is always considered healthy (cloud service)
                 # Could add actual API check if needed
                 health = ProviderHealth.HEALTHY
-            
+
             else:
                 logger.warning("Unknown provider '%s', assuming unavailable", provider)
                 health = ProviderHealth.UNAVAILABLE
-            
+
             # Cache result
             self._health_cache[provider] = health
-            
+
             logger.debug("Provider '%s' health: %s", provider, health.value)
             return health
-            
+
         except Exception as e:
             logger.error("Error checking provider '%s' health: %s", provider, str(e))
             health = ProviderHealth.UNAVAILABLE
@@ -274,7 +274,7 @@ class TTSProviderFactory:
             headers = {}
             if self.elevenlabs_api_key:
                 headers["xi-api-key"] = self.elevenlabs_api_key
-            
+
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     "https://api.elevenlabs.io/v1/voices",
@@ -288,7 +288,7 @@ class TTSProviderFactory:
                         return ProviderHealth.DEGRADED
                     else:
                         return ProviderHealth.DEGRADED
-                        
+
         except Exception as e:
             logger.debug("ElevenLabs health check failed: %s", str(e))
             return ProviderHealth.UNAVAILABLE
@@ -298,7 +298,7 @@ class TTSProviderFactory:
         self._health_cache.clear()
         logger.debug("Provider health cache cleared")
 
-    async def get_all_provider_health(self) -> Dict[str, ProviderHealth]:
+    async def get_all_provider_health(self) -> dict[str, ProviderHealth]:
         """
         Get health status for all supported providers.
         
@@ -307,8 +307,8 @@ class TTSProviderFactory:
         """
         providers = ["elevenlabs", "openai"]
         health_status = {}
-        
+
         for provider in providers:
             health_status[provider] = await self.check_provider_health(provider)
-        
+
         return health_status

@@ -7,16 +7,17 @@ and error handling for the OpenAI TTS service wrapper.
 **Validates: Requirements 5.6**
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from src.voice_agent.services.openai_tts_service import (
-    OpenAITTSService,
-    OpenAITTSConfig,
-)
+import pytest
+
 from src.voice_agent.services.elevenlabs_tts_service import (
     VoiceConfig,
     VoiceSettings,
+)
+from src.voice_agent.services.openai_tts_service import (
+    OpenAITTSConfig,
+    OpenAITTSService,
 )
 
 
@@ -81,14 +82,14 @@ class TestOpenAITTSService:
         """Test successful streaming synthesis."""
         # Mock audio response
         mock_response = AsyncMock()
-        
+
         async def mock_iter_bytes(chunk_size):
             yield b"audio_chunk_1"
             yield b"audio_chunk_2"
             yield b"audio_chunk_3"
-        
+
         mock_response.iter_bytes = mock_iter_bytes
-        
+
         mock_openai_client.audio.speech.create = AsyncMock(
             return_value=mock_response
         )
@@ -144,12 +145,12 @@ class TestOpenAITTSService:
         """Test synthesis with custom voice configuration."""
         # Mock audio response
         mock_response = AsyncMock()
-        
+
         async def mock_iter_bytes(chunk_size):
             yield b"audio_chunk"
-        
+
         mock_response.iter_bytes = mock_iter_bytes
-        
+
         mock_openai_client.audio.speech.create = AsyncMock(
             return_value=mock_response
         )
@@ -212,7 +213,7 @@ class TestOpenAITTSService:
     async def test_clone_voice_not_supported(self, tts_service):
         """Test voice cloning raises NotImplementedError."""
         audio_samples = [b"audio_data_1", b"audio_data_2"]
-        
+
         with pytest.raises(NotImplementedError, match="OpenAI TTS does not support voice cloning"):
             await tts_service.clone_voice(audio_samples, "test_voice")
 
@@ -220,7 +221,7 @@ class TestOpenAITTSService:
     async def test_get_voice_settings_returns_defaults(self, tts_service):
         """Test get_voice_settings returns default settings."""
         settings = await tts_service.get_voice_settings("alloy")
-        
+
         # Should return default settings
         assert isinstance(settings, VoiceSettings)
         assert settings.stability == 0.5
@@ -233,7 +234,7 @@ class TestOpenAITTSService:
         """Test get_voice_settings works for any voice ID."""
         settings = await tts_service.get_voice_settings("nova")
         assert isinstance(settings, VoiceSettings)
-        
+
         settings = await tts_service.get_voice_settings("unknown_voice")
         assert isinstance(settings, VoiceSettings)
 
@@ -241,10 +242,10 @@ class TestOpenAITTSService:
     async def test_list_available_voices(self, tts_service):
         """Test listing available voices."""
         voices = await tts_service.list_available_voices()
-        
+
         # Should return 6 OpenAI voices
         assert len(voices) == 6
-        
+
         # Check voice structure
         voice_ids = [v["voice_id"] for v in voices]
         assert "alloy" in voice_ids
@@ -253,7 +254,7 @@ class TestOpenAITTSService:
         assert "onyx" in voice_ids
         assert "nova" in voice_ids
         assert "shimmer" in voice_ids
-        
+
         # Check voice details
         for voice in voices:
             assert "voice_id" in voice
@@ -267,12 +268,12 @@ class TestOpenAITTSService:
         """Test synthesis with different OpenAI voices."""
         # Mock audio response
         mock_response = AsyncMock()
-        
+
         async def mock_iter_bytes(chunk_size):
             yield b"audio_chunk"
-        
+
         mock_response.iter_bytes = mock_iter_bytes
-        
+
         mock_openai_client.audio.speech.create = AsyncMock(
             return_value=mock_response
         )
@@ -283,11 +284,11 @@ class TestOpenAITTSService:
                 provider="openai",
                 voice_id=voice_id,
             )
-            
+
             chunks = []
             async for chunk in tts_service.synthesize_streaming("Test", voice_config):
                 chunks.append(chunk)
-            
+
             assert len(chunks) > 0
 
     @pytest.mark.asyncio
@@ -295,14 +296,14 @@ class TestOpenAITTSService:
         """Test synthesis with long text."""
         # Mock audio response
         mock_response = AsyncMock()
-        
+
         async def mock_iter_bytes(chunk_size):
             # Simulate multiple chunks for long text
             for i in range(10):
                 yield b"audio_chunk_" + str(i).encode()
-        
+
         mock_response.iter_bytes = mock_iter_bytes
-        
+
         mock_openai_client.audio.speech.create = AsyncMock(
             return_value=mock_response
         )
@@ -325,7 +326,7 @@ class TestOpenAITTSService:
         assert hasattr(tts_service, "clone_voice")
         assert hasattr(tts_service, "get_voice_settings")
         assert hasattr(tts_service, "list_available_voices")
-        
+
         # Check methods are callable
         assert callable(tts_service.synthesize_streaming)
         assert callable(tts_service.apply_emotional_context)
@@ -343,7 +344,7 @@ class TestOpenAITTSConfig:
             api_key="test_key",
             default_voice_config=voice_config,
         )
-        
+
         assert config.api_key == "test_key"
         assert config.default_voice_config == voice_config
         assert config.model == "tts-1"
@@ -357,6 +358,6 @@ class TestOpenAITTSConfig:
             model="tts-1-hd",
             chunk_size=8192,
         )
-        
+
         assert config.model == "tts-1-hd"
         assert config.chunk_size == 8192

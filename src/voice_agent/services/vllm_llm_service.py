@@ -9,22 +9,16 @@ continuous batching, and GPU resource management for production workloads.
 """
 
 import logging
-import json
-from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
 import aiohttp
 
 from .llm_service import (
-    LLMService,
+    ConversationContext,
     LLMConfig,
     LLMResponse,
-    Intent,
-    IntentType,
-    ToolCall,
-    ConversationContext,
+    LLMService,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +44,8 @@ class vLLMLLMService(LLMService):
         base_url: str = "http://localhost:8000",
         gpu_memory_utilization: float = 0.9,
         max_num_seqs: int = 256,
-        max_model_len: Optional[int] = None,
-        fallback_service: Optional[LLMService] = None,
+        max_model_len: int | None = None,
+        fallback_service: LLMService | None = None,
     ):
         """
         Initialize vLLM LLM service.
@@ -65,18 +59,18 @@ class vLLMLLMService(LLMService):
             fallback_service: Fallback LLM service if vLLM is unavailable
         """
         super().__init__(config)
-        
+
         if config.provider != "vllm":
             raise ValueError(f"vLLM service requires provider='vllm', got '{config.provider}'")
-        
+
         self.base_url = base_url.rstrip("/")
         self.gpu_memory_utilization = gpu_memory_utilization
         self.max_num_seqs = max_num_seqs
         self.max_model_len = max_model_len
         self.fallback_service = fallback_service
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._server_available = None  # Cache server availability
-        
+
         logger.info(
             "vLLM LLM service initialized (model: %s, GPU mem: %.1f%%, max_seqs: %d, base_url: %s)",
             config.model,
@@ -113,33 +107,33 @@ class vLLMLLMService(LLMService):
         # Return cached result if available
         if self._server_available is not None:
             return self._server_available
-        
+
         try:
             session = await self._get_session()
             async with session.get(f"{self.base_url}/v1/models") as response:
                 if response.status == 200:
                     data = await response.json()
                     models = data.get("data", [])
-                    
+
                     # Check if our model is available
                     model_ids = [m.get("id", "") for m in models]
                     self._server_available = any(
                         self.config.model in model_id for model_id in model_ids
                     )
-                    
+
                     if not self._server_available:
                         logger.warning(
                             "Model '%s' not found in vLLM server. Available models: %s",
                             self.config.model,
                             model_ids,
                         )
-                    
+
                     return self._server_available
                 else:
                     logger.error("Failed to check vLLM models: HTTP %d", response.status)
                     self._server_available = False
                     return False
-                    
+
         except Exception as e:
             logger.error("Error checking vLLM server availability: %s", str(e))
             self._server_available = False
@@ -169,7 +163,7 @@ class vLLMLLMService(LLMService):
         """
         # Check if server is available
         is_available = await self.check_server_availability()
-        
+
         if not is_available:
             logger.warning("vLLM server unavailable, attempting fallback")
             if self.fallback_service:
@@ -182,22 +176,22 @@ class vLLMLLMService(LLMService):
                     ) from e
             else:
                 raise RuntimeError(
-                    f"vLLM server is not available and no fallback configured"
+                    "vLLM server is not available and no fallback configured"
                 )
-        
+
         try:
             # Build prompt with voice-optimized instructions
             prompt = self._build_prompt(transcript, context)
-            
+
             # Call vLLM API (OpenAI-compatible)
             response_text = await self._call_vllm(prompt)
-            
+
             # Parse response and extract intent/parameters
             return self._parse_response(response_text, transcript)
-            
+
         except Exception as e:
             logger.error("vLLM API error: %s", str(e))
-            
+
             # Try fallback if available
             if self.fallback_service:
                 logger.info("Attempting fallback service after vLLM error")
@@ -205,7 +199,7 @@ class vLLMLLMService(LLMService):
                     return await self.fallback_service.generate_response(transcript, context)
                 except Exception as fallback_error:
                     logger.error("Fallback service failed: %s", str(fallback_error))
-            
+
             raise RuntimeError(f"Failed to generate LLM response: {str(e)}") from e
 
     async def _call_vllm(self, prompt: str) -> str:
@@ -225,7 +219,7 @@ class vLLMLLMService(LLMService):
             RuntimeError: If API call fails
         """
         session = await self._get_session()
-        
+
         # Build request payload (OpenAI-compatible format)
         payload = {
             "model": self.config.model,
@@ -240,11 +234,11 @@ class vLLMLLMService(LLMService):
             "presence_penalty": self.config.presence_penalty,
             "stream": False,  # Non-streaming for simplicity (can be enhanced later)
         }
-        
+
         # Add vLLM-specific parameters if configured
         if self.max_model_len is not None:
             payload["max_model_len"] = self.max_model_len
-        
+
         try:
             async with session.post(
                 f"{self.base_url}/v1/chat/completions",
@@ -252,7 +246,7 @@ class vLLMLLMService(LLMService):
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    
+
                     # Extract response text from OpenAI-compatible format
                     choices = data.get("choices", [])
                     if choices:
@@ -265,7 +259,7 @@ class vLLMLLMService(LLMService):
                     raise RuntimeError(
                         f"vLLM API returned status {response.status}: {error_text}"
                     )
-                    
+
         except aiohttp.ClientError as e:
             raise RuntimeError(f"Network error calling vLLM: {str(e)}") from e
 
@@ -293,13 +287,13 @@ class vLLMLLMService(LLMService):
                 history_text += f"\nUser: {content}"
             elif role == "assistant":
                 history_text += f"\nAssistant: {content}"
-        
+
         # Build complete prompt
         prompt = f"""{history_text}
 
 User: {transcript}
 Assistant:"""
-        
+
         return prompt
 
     def _build_voice_optimized_system_prompt(self) -> str:
@@ -316,7 +310,7 @@ Assistant:"""
             Voice-optimized system prompt
         """
         base_prompt = self.config.system_prompt or "You are a helpful voice assistant."
-        
+
         voice_instructions = """
 
 CRITICAL VOICE RESPONSE RULES:
@@ -332,7 +326,7 @@ CRITICAL VOICE RESPONSE RULES:
 10. Avoid technical jargon unless specifically requested
 
 Remember: Your responses will be spoken aloud by a text-to-speech system. Write as you would speak naturally in a conversation."""
-        
+
         return base_prompt + voice_instructions
 
     def _parse_response(
@@ -355,24 +349,24 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         """
         # Classify intent from original transcript
         intent = self.classify_intent(original_transcript)
-        
+
         # Extract parameters from transcript
         parameters = self.extract_parameters(original_transcript, intent)
-        
+
         # Determine if tool should be used
         tool_call = self.should_use_tool(intent, parameters)
-        
+
         # If we have a tool call, add timestamp
         if tool_call:
             tool_call.timestamp = datetime.now(timezone.utc).isoformat()
             logger.info("Tool call detected: %s with params: %s", tool_call.tool_name, parameters)
-        
+
         # Apply voice optimization to response
         formatted_text = self.format_for_voice(response_text)
-        
+
         # Extract emotional tags
         emotional_tags = self._extract_emotional_tags(response_text)
-        
+
         return LLMResponse(
             text=formatted_text,
             intent=intent,
@@ -388,7 +382,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             },
         )
 
-    def _extract_emotional_tags(self, text: str) -> List[str]:
+    def _extract_emotional_tags(self, text: str) -> list[str]:
         """
         Extract emotional tags for TTS from response text.
         
@@ -403,7 +397,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
         """
         tags = []
         text_lower = text.lower()
-        
+
         # Detect emotional context
         if any(word in text_lower for word in ["sorry", "apologize", "unfortunately"]):
             tags.append("empathetic")
@@ -413,7 +407,7 @@ Remember: Your responses will be spoken aloud by a text-to-speech system. Write 
             tags.append("understanding")
         if "?" in text:
             tags.append("questioning")
-        
+
         return tags
 
     async def __aenter__(self):

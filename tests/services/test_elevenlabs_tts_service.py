@@ -7,16 +7,15 @@ and error handling for the ElevenLabs TTS service wrapper.
 **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6**
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import AsyncIterator
+
+import pytest
 
 from src.voice_agent.services.elevenlabs_tts_service import (
+    AudioTag,
     ElevenLabsTTSService,
     TTSConfig,
     VoiceConfig,
-    VoiceSettings,
-    AudioTag,
 )
 
 
@@ -221,7 +220,7 @@ class TestElevenLabsTTSService:
     async def test_clone_voice_not_implemented(self, tts_service):
         """Test voice cloning raises NotImplementedError."""
         audio_samples = [b"audio_data_1", b"audio_data_2"]
-        
+
         with pytest.raises(NotImplementedError, match="Voice cloning requires file upload"):
             await tts_service.clone_voice(audio_samples, "test_voice")
 

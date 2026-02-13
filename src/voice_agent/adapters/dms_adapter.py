@@ -7,9 +7,9 @@ supporting service appointment management including slot search and booking.
 Requirements: 4.2, 4.6
 """
 
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
-from datetime import datetime, date
+from datetime import date, datetime
+from typing import Any
 
 
 @dataclass
@@ -32,8 +32,8 @@ class ServiceSlot:
     end_time: datetime
     service_type: str
     status: str  # "available", "booked", "unavailable"
-    bay_number: Optional[str] = None
-    technician_id: Optional[str] = None
+    bay_number: str | None = None
+    technician_id: str | None = None
 
 
 @dataclass
@@ -51,9 +51,9 @@ class ServiceAppointment:
     end_time: datetime
     service_type: str
     status: str  # "scheduled", "in_progress", "completed", "cancelled"
-    bay_number: Optional[str] = None
-    technician_id: Optional[str] = None
-    notes: Optional[str] = None
+    bay_number: str | None = None
+    technician_id: str | None = None
+    notes: str | None = None
 
 
 @dataclass
@@ -72,7 +72,7 @@ class MaintenanceQuote:
     estimated_duration_minutes: int
     parts_available: bool
     valid_until: datetime
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 @dataclass
@@ -87,7 +87,7 @@ class PartAvailability:
     quantity_available: int
     quantity_needed: int
     in_stock: bool
-    estimated_arrival: Optional[datetime] = None
+    estimated_arrival: datetime | None = None
 
 
 @dataclass
@@ -100,7 +100,7 @@ class TriageResult:
     severity: str  # "critical", "urgent", "moderate", "low"
     safe_to_drive: bool
     recommended_action: str
-    estimated_repair_time: Optional[int] = None  # minutes
+    estimated_repair_time: int | None = None  # minutes
     requires_tow: bool = False
     priority_score: int = 0  # 0-100, higher is more urgent
 
@@ -117,7 +117,7 @@ class DMSAdapter:
     - 4.2: DMS integration for automotive industry
     - 4.6: Service scheduling, maintenance quotes, and emergency triage
     """
-    
+
     # Service type classifications
     SERVICE_TYPES = {
         "oil_change": {"category": "maintenance", "typical_duration": 30},
@@ -129,7 +129,7 @@ class DMSAdapter:
         "battery_replacement": {"category": "maintenance", "typical_duration": 30},
         "alignment": {"category": "maintenance", "typical_duration": 60},
     }
-    
+
     def __init__(
         self,
         base_url: str,
@@ -151,7 +151,7 @@ class DMSAdapter:
         self.api_key = api_key
         self.timeout = timeout
         self._authenticated = False
-    
+
     async def authenticate(self) -> bool:
         """
         Authenticate with the DMS API using API key.
@@ -165,13 +165,13 @@ class DMSAdapter:
             ValueError: If authentication fails
         """
         import aiohttp
-        
+
         url = f"{self.base_url}/auth/validate"
         headers = {
             "X-API-Key": self.api_key,
             "Content-Type": "application/json"
         }
-        
+
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(
@@ -191,19 +191,19 @@ class DMSAdapter:
                 raise
             except aiohttp.ClientError as e:
                 raise ValueError(f"Authentication request failed: {str(e)}")
-    
+
     async def _ensure_authenticated(self) -> None:
         """Ensure we are authenticated before making requests."""
         if not self._authenticated:
             await self.authenticate()
-    
+
     async def _make_request(
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         Make an authenticated HTTP request to the DMS API.
         
@@ -220,16 +220,16 @@ class DMSAdapter:
             ValueError: If request fails
         """
         import aiohttp
-        
+
         await self._ensure_authenticated()
-        
+
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         headers = {
             "X-API-Key": self.api_key,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        
+
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.request(
@@ -241,12 +241,12 @@ class DMSAdapter:
                     timeout=aiohttp.ClientTimeout(total=self.timeout)
                 ) as response:
                     response_text = await response.text()
-                    
+
                     if response.status >= 400:
                         raise ValueError(
                             f"DMS operation failed with status {response.status}: {response_text}"
                         )
-                    
+
                     if response_text:
                         return await response.json()
                     return {}
@@ -254,8 +254,8 @@ class DMSAdapter:
                 raise
             except aiohttp.ClientError as e:
                 raise ValueError(f"HTTP request failed: {str(e)}")
-    
-    def _parse_service_slot(self, slot_data: Dict[str, Any]) -> ServiceSlot:
+
+    def _parse_service_slot(self, slot_data: dict[str, Any]) -> ServiceSlot:
         """
         Parse a service slot from DMS API response.
         
@@ -277,8 +277,8 @@ class DMSAdapter:
             bay_number=slot_data.get("bay_number"),
             technician_id=slot_data.get("technician_id")
         )
-    
-    def _parse_service_appointment(self, appointment_data: Dict[str, Any]) -> ServiceAppointment:
+
+    def _parse_service_appointment(self, appointment_data: dict[str, Any]) -> ServiceAppointment:
         """
         Parse a service appointment from DMS API response.
         
@@ -303,13 +303,13 @@ class DMSAdapter:
             technician_id=appointment_data.get("technician_id"),
             notes=appointment_data.get("notes")
         )
-    
+
     async def find_service_slots(
         self,
         vehicle_id: str,
         service_type: str,
         date_range: DateRange
-    ) -> List[ServiceSlot]:
+    ) -> list[ServiceSlot]:
         """
         Search for available service appointment slots.
         
@@ -335,14 +335,14 @@ class DMSAdapter:
             "end_date": date_range.end.isoformat(),
             "status": "available"
         }
-        
+
         # Execute search request
         response = await self._make_request(
             method="GET",
             endpoint="service/slots",
             params=params
         )
-        
+
         # Parse slots from response
         slots = []
         if "slots" in response:
@@ -351,19 +351,19 @@ class DMSAdapter:
                 # Only include slots within the requested date range
                 if date_range.start <= slot.start_time.date() <= date_range.end:
                     slots.append(slot)
-        
+
         # Sort by start time
         slots.sort(key=lambda s: s.start_time)
-        
+
         return slots
-    
+
     async def book_service(
         self,
         vehicle_id: str,
         slot_id: str,
         service_type: str,
-        vin: Optional[str] = None,
-        notes: Optional[str] = None
+        vin: str | None = None,
+        notes: str | None = None
     ) -> ServiceAppointment:
         """
         Book a service appointment.
@@ -386,7 +386,7 @@ class DMSAdapter:
         # Validate required fields
         if not vehicle_id or not slot_id or not service_type:
             raise ValueError("Vehicle ID, Slot ID, and Service Type are required for booking")
-        
+
         # Build appointment data
         appointment_data = {
             "dealer_id": self.dealer_id,
@@ -395,27 +395,27 @@ class DMSAdapter:
             "service_type": service_type,
             "status": "scheduled"
         }
-        
+
         if vin:
             appointment_data["vin"] = vin
-        
+
         if notes:
             appointment_data["notes"] = notes
-        
+
         # Execute booking request
         response = await self._make_request(
             method="POST",
             endpoint="service/appointments",
             data=appointment_data
         )
-        
+
         # Parse and return appointment
         if "appointment" in response:
             return self._parse_service_appointment(response["appointment"])
-        
+
         raise ValueError("Booking operation did not return a valid service appointment")
-    
-    def classify_service_type(self, service_type: str) -> Dict[str, Any]:
+
+    def classify_service_type(self, service_type: str) -> dict[str, Any]:
         """
         Classify a service type and return its metadata.
         
@@ -429,18 +429,18 @@ class DMSAdapter:
         """
         if service_type in self.SERVICE_TYPES:
             return self.SERVICE_TYPES[service_type].copy()
-        
+
         # Default classification for unknown service types
         return {
             "category": "other",
             "typical_duration": 60
         }
-    
+
     async def get_maintenance_quote(
         self,
         vehicle_id: str,
         service_type: str,
-        vin: Optional[str] = None
+        vin: str | None = None
     ) -> MaintenanceQuote:
         """
         Retrieve a maintenance service quote with pricing and parts availability.
@@ -464,17 +464,17 @@ class DMSAdapter:
             "vehicle_id": vehicle_id,
             "service_type": service_type
         }
-        
+
         if vin:
             params["vin"] = vin
-        
+
         # Execute quote request
         response = await self._make_request(
             method="GET",
             endpoint="service/quotes",
             params=params
         )
-        
+
         # Parse and return quote
         if "quote" in response:
             quote_data = response["quote"]
@@ -492,15 +492,15 @@ class DMSAdapter:
                 ),
                 notes=quote_data.get("notes")
             )
-        
+
         raise ValueError("Quote retrieval did not return a valid maintenance quote")
-    
+
     async def check_parts_availability(
         self,
         vehicle_id: str,
         service_type: str,
-        vin: Optional[str] = None
-    ) -> List[PartAvailability]:
+        vin: str | None = None
+    ) -> list[PartAvailability]:
         """
         Check parts availability for a specific service.
         
@@ -523,17 +523,17 @@ class DMSAdapter:
             "vehicle_id": vehicle_id,
             "service_type": service_type
         }
-        
+
         if vin:
             params["vin"] = vin
-        
+
         # Execute parts availability request
         response = await self._make_request(
             method="GET",
             endpoint="service/parts/availability",
             params=params
         )
-        
+
         # Parse parts availability
         parts = []
         if "parts" in response:
@@ -551,14 +551,14 @@ class DMSAdapter:
                     )
                 )
                 parts.append(part)
-        
+
         return parts
-    
+
     async def triage_emergency(
         self,
         vehicle_id: str,
         issue_description: str,
-        vin: Optional[str] = None
+        vin: str | None = None
     ) -> TriageResult:
         """
         Assess the severity of a vehicle issue and provide emergency triage.
@@ -582,17 +582,17 @@ class DMSAdapter:
             "vehicle_id": vehicle_id,
             "issue_description": issue_description
         }
-        
+
         if vin:
             triage_data["vin"] = vin
-        
+
         # Execute triage request
         response = await self._make_request(
             method="POST",
             endpoint="service/triage",
             data=triage_data
         )
-        
+
         # Parse and return triage result
         if "triage" in response:
             triage_data = response["triage"]
@@ -604,5 +604,5 @@ class DMSAdapter:
                 requires_tow=bool(triage_data.get("requires_tow", False)),
                 priority_score=int(triage_data.get("priority_score", 50))
             )
-        
+
         raise ValueError("Triage assessment did not return a valid result")

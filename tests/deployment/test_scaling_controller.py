@@ -5,7 +5,8 @@ Tests scaling decisions, policy configuration, and cost optimization logic.
 """
 
 import pytest
-from voice_agent.deployment import ScalingController, LoadMetrics, ScalingPolicy
+
+from voice_agent.deployment import LoadMetrics, ScalingController, ScalingPolicy
 
 
 @pytest.fixture
@@ -30,13 +31,13 @@ def controller(default_policy):
 
 class TestScalingController:
     """Test suite for ScalingController."""
-    
+
     def test_initialization(self, default_policy):
         """Test controller initialization with policy."""
         controller = ScalingController(default_policy)
         assert controller.policy == default_policy
         assert controller._last_scale_time is None
-    
+
     def test_get_current_load(self, controller):
         """Test retrieving current load metrics."""
         metrics = controller.get_current_load()
@@ -45,7 +46,7 @@ class TestScalingController:
         assert metrics.gpu_utilization_percent >= 0.0
         assert metrics.request_queue_depth >= 0
         assert metrics.avg_response_latency_ms >= 0.0
-    
+
     def test_calculate_desired_replicas_low_load(self, controller):
         """Test replica calculation with low load."""
         metrics = LoadMetrics(
@@ -60,7 +61,7 @@ class TestScalingController:
         )
         # Should respect min_replicas
         assert desired == 1
-    
+
     def test_calculate_desired_replicas_high_load(self, controller):
         """Test replica calculation with high load."""
         metrics = LoadMetrics(
@@ -75,7 +76,7 @@ class TestScalingController:
         )
         # Should scale up based on concurrent calls (500/50 = 10)
         assert desired == 10
-    
+
     def test_calculate_desired_replicas_respects_max(self, controller):
         """Test that desired replicas respects max limit."""
         metrics = LoadMetrics(
@@ -90,7 +91,7 @@ class TestScalingController:
         )
         # Should not exceed max_replicas (10)
         assert desired <= controller.policy.max_replicas
-    
+
     def test_calculate_desired_replicas_respects_min(self, controller):
         """Test that desired replicas respects min limit."""
         metrics = LoadMetrics(
@@ -105,7 +106,7 @@ class TestScalingController:
         )
         # Should not go below min_replicas (1)
         assert desired >= controller.policy.min_replicas
-    
+
     def test_should_scale_up_high_utilization(self, controller):
         """Test scale up decision with high GPU utilization."""
         metrics = LoadMetrics(
@@ -120,7 +121,7 @@ class TestScalingController:
             metrics=metrics
         )
         assert should_scale is True
-    
+
     def test_should_scale_down_low_utilization(self, controller):
         """Test scale down decision with low GPU utilization."""
         metrics = LoadMetrics(
@@ -135,7 +136,7 @@ class TestScalingController:
             metrics=metrics
         )
         assert should_scale is True
-    
+
     def test_should_not_scale_same_replicas(self, controller):
         """Test that scaling is not triggered when replicas match."""
         metrics = LoadMetrics(
@@ -150,7 +151,7 @@ class TestScalingController:
             metrics=metrics
         )
         assert should_scale is False
-    
+
     def test_should_not_scale_moderate_utilization(self, controller):
         """Test that scaling is not triggered with moderate utilization."""
         metrics = LoadMetrics(
@@ -165,17 +166,17 @@ class TestScalingController:
             metrics=metrics
         )
         assert should_scale is False
-    
+
     def test_scale_up(self, controller):
         """Test scale up operation."""
         # Should not raise exception
         controller.scale_up(5)
-    
+
     def test_scale_down(self, controller):
         """Test scale down operation."""
         # Should not raise exception
         controller.scale_down(2)
-    
+
     def test_configure_scaling_policy(self, controller):
         """Test updating scaling policy."""
         new_policy = ScalingPolicy(
@@ -191,7 +192,7 @@ class TestScalingController:
         assert controller.policy == new_policy
         assert controller.policy.min_replicas == 2
         assert controller.policy.max_replicas == 20
-    
+
     def test_optimize_cost_prefer_cloud(self, controller):
         """Test cost optimization preferring cloud APIs."""
         metrics = LoadMetrics(
@@ -206,7 +207,7 @@ class TestScalingController:
             local_cost_per_call=0.05
         )
         assert strategy == "cloud"
-    
+
     def test_optimize_cost_prefer_local(self, controller):
         """Test cost optimization preferring local inference."""
         metrics = LoadMetrics(
@@ -221,7 +222,7 @@ class TestScalingController:
             local_cost_per_call=0.01
         )
         assert strategy == "local"
-    
+
     def test_optimize_cost_no_calls(self, controller):
         """Test cost optimization with no active calls."""
         metrics = LoadMetrics(
@@ -237,7 +238,7 @@ class TestScalingController:
         )
         # Should prefer cloud when no load (no GPU needed)
         assert strategy == "cloud"
-    
+
     def test_optimize_cost_hybrid(self, controller):
         """Test cost optimization recommending hybrid approach."""
         metrics = LoadMetrics(
@@ -259,7 +260,7 @@ class TestScalingController:
 
 class TestLoadMetrics:
     """Test suite for LoadMetrics dataclass."""
-    
+
     def test_load_metrics_creation(self):
         """Test creating LoadMetrics instance."""
         metrics = LoadMetrics(
@@ -276,7 +277,7 @@ class TestLoadMetrics:
 
 class TestScalingPolicy:
     """Test suite for ScalingPolicy dataclass."""
-    
+
     def test_scaling_policy_creation(self):
         """Test creating ScalingPolicy instance."""
         policy = ScalingPolicy(

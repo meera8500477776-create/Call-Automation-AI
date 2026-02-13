@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Dict, List, Optional
 
 from .session import ConversationTurn, Session
 
@@ -25,7 +24,7 @@ class SessionStore(ABC):
         pass
 
     @abstractmethod
-    def get(self, session_id: str) -> Optional[Session]:
+    def get(self, session_id: str) -> Session | None:
         """Retrieve a session by ID.
         
         Args:
@@ -49,7 +48,7 @@ class SessionStore(ABC):
         pass
 
     @abstractmethod
-    def list_active_sessions(self) -> List[Session]:
+    def list_active_sessions(self) -> list[Session]:
         """List all active (not ended) sessions.
         
         Returns:
@@ -58,7 +57,7 @@ class SessionStore(ABC):
         pass
 
     @abstractmethod
-    def get_by_caller(self, caller_id: str) -> List[Session]:
+    def get_by_caller(self, caller_id: str) -> list[Session]:
         """Get all sessions for a specific caller.
         
         Args:
@@ -79,7 +78,7 @@ class InMemorySessionStore(SessionStore):
 
     def __init__(self) -> None:
         """Initialize the in-memory store."""
-        self._sessions: Dict[str, Session] = {}
+        self._sessions: dict[str, Session] = {}
 
     def save(self, session: Session) -> None:
         """Save or update a session in memory.
@@ -89,7 +88,7 @@ class InMemorySessionStore(SessionStore):
         """
         self._sessions[session.session_id] = session
 
-    def get(self, session_id: str) -> Optional[Session]:
+    def get(self, session_id: str) -> Session | None:
         """Retrieve a session from memory.
         
         Args:
@@ -114,7 +113,7 @@ class InMemorySessionStore(SessionStore):
             return True
         return False
 
-    def list_active_sessions(self) -> List[Session]:
+    def list_active_sessions(self) -> list[Session]:
         """List all active sessions in memory.
         
         Returns:
@@ -125,7 +124,7 @@ class InMemorySessionStore(SessionStore):
             if session.is_active()
         ]
 
-    def get_by_caller(self, caller_id: str) -> List[Session]:
+    def get_by_caller(self, caller_id: str) -> list[Session]:
         """Get all sessions for a specific caller from memory.
         
         Args:
@@ -155,7 +154,7 @@ class SessionManager:
     allowing different storage backends to be plugged in.
     """
 
-    def __init__(self, store: Optional[SessionStore] = None) -> None:
+    def __init__(self, store: SessionStore | None = None) -> None:
         """Initialize the session manager.
         
         Args:
@@ -167,8 +166,8 @@ class SessionManager:
         self,
         tenant_id: str,
         caller_id: str,
-        session_id: Optional[str] = None,
-        metadata: Optional[Dict] = None
+        session_id: str | None = None,
+        metadata: dict | None = None
     ) -> Session:
         """Create a new session.
         
@@ -186,14 +185,14 @@ class SessionManager:
             caller_id=caller_id,
             metadata=metadata or {}
         )
-        
+
         if session_id:
             session.session_id = session_id
-        
+
         self._store.save(session)
         return session
 
-    def get_session(self, session_id: str) -> Optional[Session]:
+    def get_session(self, session_id: str) -> Session | None:
         """Retrieve a session by ID.
         
         Args:
@@ -217,11 +216,11 @@ class SessionManager:
         session_id: str,
         speaker: str,
         transcript: str,
-        intent: Optional[str] = None,
-        parameters: Optional[Dict] = None,
-        tool_calls: Optional[List[str]] = None,
-        metadata: Optional[Dict] = None
-    ) -> Optional[ConversationTurn]:
+        intent: str | None = None,
+        parameters: dict | None = None,
+        tool_calls: list[str] | None = None,
+        metadata: dict | None = None
+    ) -> ConversationTurn | None:
         """Add a conversation turn to a session.
         
         Args:
@@ -239,7 +238,7 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return None
-        
+
         turn = ConversationTurn(
             speaker=speaker,
             transcript=transcript,
@@ -248,10 +247,10 @@ class SessionManager:
             tool_calls=tool_calls or [],
             metadata=metadata or {}
         )
-        
+
         session.add_turn(turn)
         self._store.save(session)
-        
+
         return turn
 
     def end_session(self, session_id: str) -> bool:
@@ -266,17 +265,17 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return False
-        
+
         session.end_session()
         self._store.save(session)
-        
+
         return True
 
     def cleanup_session(
         self,
         session_id: str,
         persist: bool = True
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """Clean up session resources and optionally persist logs.
         
         This method performs cleanup operations when a session ends,
@@ -293,12 +292,12 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return None
-        
+
         # Ensure session is marked as ended
         if session.is_active():
             session.end_session()
             self._store.save(session)
-        
+
         # Generate session summary
         summary = {
             "session_id": session.session_id,
@@ -318,11 +317,11 @@ class SessionManager:
             "transfer_reason": session.metadata.get("transfer_reason"),
             "metadata": session.metadata
         }
-        
+
         # If not persisting, delete the session from storage
         if not persist:
             self._store.delete(session_id)
-        
+
         return summary
 
     def delete_session(self, session_id: str) -> bool:
@@ -336,7 +335,7 @@ class SessionManager:
         """
         return self._store.delete(session_id)
 
-    def get_active_sessions(self) -> List[Session]:
+    def get_active_sessions(self) -> list[Session]:
         """Get all currently active sessions.
         
         Returns:
@@ -344,7 +343,7 @@ class SessionManager:
         """
         return self._store.list_active_sessions()
 
-    def get_caller_sessions(self, caller_id: str) -> List[Session]:
+    def get_caller_sessions(self, caller_id: str) -> list[Session]:
         """Get all sessions for a specific caller.
         
         Args:
@@ -372,17 +371,17 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return False
-        
+
         session.workflow_stage = stage
         self._store.save(session)
-        
+
         return True
 
     def get_conversation_history(
         self,
         session_id: str,
-        limit: Optional[int] = None
-    ) -> Optional[List[ConversationTurn]]:
+        limit: int | None = None
+    ) -> list[ConversationTurn] | None:
         """Get conversation history for a session.
         
         Args:
@@ -395,12 +394,12 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return None
-        
+
         history = session.conversation_history
-        
+
         if limit and limit > 0:
             return history[-limit:]
-        
+
         return history
 
     def update_context(
@@ -424,13 +423,13 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return False
-        
+
         session.add_turn(turn)
         self._store.save(session)
-        
+
         return True
 
-    def get_context(self, session_id: str) -> Optional[Dict]:
+    def get_context(self, session_id: str) -> dict | None:
         """Get the current conversation context for a session.
         
         Returns a dictionary containing the current conversation state,
@@ -446,7 +445,7 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return None
-        
+
         return {
             "session_id": session.session_id,
             "tenant_id": session.tenant_id,
@@ -465,8 +464,8 @@ class SessionManager:
         self,
         session_id: str,
         reason: str,
-        metadata: Optional[Dict] = None
-    ) -> Optional[Dict]:
+        metadata: dict | None = None
+    ) -> dict | None:
         """Initiate a transfer to a human agent.
         
         This method marks the session for human handoff, records the transfer
@@ -484,7 +483,7 @@ class SessionManager:
         session = self._store.get(session_id)
         if not session:
             return None
-        
+
         # Update session metadata with transfer information
         transfer_info = {
             "transfer_requested": True,
@@ -492,18 +491,19 @@ class SessionManager:
             "transfer_timestamp": datetime.utcnow().isoformat(),
             "transfer_metadata": metadata or {}
         }
-        
+
         session.metadata.update(transfer_info)
         session.workflow_stage = "transferring_to_human"
-        
+
         self._store.save(session)
-        
+
         # Return transfer information for telephony system
         return {
             "session_id": session.session_id,
             "tenant_id": session.tenant_id,
             "caller_id": session.caller_id,
             "reason": reason,
+            "transfer_initiated": True,  # Add for backward compatibility
             "conversation_summary": {
                 "turn_count": session.get_turn_count(),
                 "current_intent": session.current_intent,

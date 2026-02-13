@@ -7,16 +7,17 @@ and failover logic.
 **Validates: Requirements 13.4, 13.6, 13.7**
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.voice_agent.services.llm_factory import (
     LLMProviderFactory,
     ProviderHealth,
 )
 from src.voice_agent.services.llm_service import LLMConfig
-from src.voice_agent.services.openai_llm_service import OpenAILLMService
 from src.voice_agent.services.ollama_llm_service import OllamaLLMService
+from src.voice_agent.services.openai_llm_service import OpenAILLMService
 from src.voice_agent.services.vllm_llm_service import vLLMLLMService
 
 
@@ -74,7 +75,7 @@ class TestLLMProviderFactory:
     async def test_create_openai_service(self, factory, openai_config):
         """Test creating OpenAI service instance."""
         service = await factory.create_llm_service(openai_config)
-        
+
         assert isinstance(service, OpenAILLMService)
         assert service.config.provider == "openai"
         assert service.config.model == "gpt-4"
@@ -86,9 +87,9 @@ class TestLLMProviderFactory:
             with patch.object(OllamaLLMService, 'check_model_availability', new_callable=AsyncMock) as mock_check:
                 mock_health.return_value = ProviderHealth.HEALTHY
                 mock_check.return_value = True
-                
+
                 service = await factory.create_llm_service(ollama_config)
-                
+
                 assert isinstance(service, OllamaLLMService)
                 assert service.config.provider == "ollama"
                 assert service.config.model == "llama2"
@@ -101,9 +102,9 @@ class TestLLMProviderFactory:
             with patch.object(vLLMLLMService, 'check_server_availability', new_callable=AsyncMock) as mock_check:
                 mock_health.return_value = ProviderHealth.HEALTHY
                 mock_check.return_value = True
-                
+
                 service = await factory.create_llm_service(vllm_config)
-                
+
                 assert isinstance(service, vLLMLLMService)
                 assert service.config.provider == "vllm"
                 assert service.config.model == "meta-llama/Llama-2-7b-chat-hf"
@@ -119,10 +120,10 @@ class TestLLMProviderFactory:
         )
         # Manually set invalid provider to bypass validation
         config.provider = "unsupported"
-        
+
         # Disable failover to get the expected error
         factory_no_failover = LLMProviderFactory(enable_failover=False)
-        
+
         with pytest.raises((ValueError, RuntimeError)):
             await factory_no_failover.create_llm_service(config)
 
@@ -133,14 +134,14 @@ class TestLLMProviderFactory:
             "base_url": "http://custom:11434",
             "gpu_enabled": False,
         }
-        
+
         with patch.object(factory, 'check_provider_health', new_callable=AsyncMock) as mock_health:
             with patch.object(OllamaLLMService, 'check_model_availability', new_callable=AsyncMock) as mock_check:
                 mock_health.return_value = ProviderHealth.HEALTHY
                 mock_check.return_value = True
-                
+
                 service = await factory.create_llm_service(ollama_config, provider_config)
-                
+
                 assert service.base_url == "http://custom:11434"
                 assert service.gpu_enabled is False
 
@@ -153,16 +154,16 @@ class TestLLMProviderFactory:
                     mock_health.return_value = ProviderHealth.HEALTHY
                     mock_ollama.return_value = True
                     mock_vllm.return_value = True
-                    
+
                     openai_service = await factory.create_llm_service(openai_config)
                     ollama_service = await factory.create_llm_service(ollama_config)
                     vllm_service = await factory.create_llm_service(vllm_config)
-                    
+
                     # All should have generate_response method
                     assert hasattr(openai_service, 'generate_response')
                     assert hasattr(ollama_service, 'generate_response')
                     assert hasattr(vllm_service, 'generate_response')
-                    
+
                     # All should have config attribute
                     assert hasattr(openai_service, 'config')
                     assert hasattr(ollama_service, 'config')
@@ -186,14 +187,14 @@ class TestHealthChecking:
             mock_response.status = 200
             mock_response.__aenter__ = AsyncMock(return_value=mock_response)
             mock_response.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session = AsyncMock()
             mock_session.get = MagicMock(return_value=mock_response)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session_class.return_value = mock_session
-            
+
             health = await factory.check_provider_health("ollama")
             assert health == ProviderHealth.HEALTHY
 
@@ -205,14 +206,14 @@ class TestHealthChecking:
             mock_response.status = 500
             mock_response.__aenter__ = AsyncMock(return_value=mock_response)
             mock_response.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session = AsyncMock()
             mock_session.get = MagicMock(return_value=mock_response)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session_class.return_value = mock_session
-            
+
             health = await factory.check_provider_health("ollama")
             assert health == ProviderHealth.DEGRADED
 
@@ -224,9 +225,9 @@ class TestHealthChecking:
             mock_session.get.side_effect = Exception("Connection refused")
             mock_session.__aenter__.return_value = mock_session
             mock_session.__aexit__.return_value = None
-            
+
             mock_session_class.return_value = mock_session
-            
+
             health = await factory.check_provider_health("ollama")
             assert health == ProviderHealth.UNAVAILABLE
 
@@ -238,14 +239,14 @@ class TestHealthChecking:
             mock_response.status = 200
             mock_response.__aenter__ = AsyncMock(return_value=mock_response)
             mock_response.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session = AsyncMock()
             mock_session.get = MagicMock(return_value=mock_response)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session_class.return_value = mock_session
-            
+
             health = await factory.check_provider_health("vllm")
             assert health == ProviderHealth.HEALTHY
 
@@ -257,22 +258,22 @@ class TestHealthChecking:
             mock_response.status = 200
             mock_response.__aenter__ = AsyncMock(return_value=mock_response)
             mock_response.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session = AsyncMock()
             mock_session.get = MagicMock(return_value=mock_response)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             mock_session_class.return_value = mock_session
-            
+
             # First call should hit the API
             health1 = await factory.check_provider_health("ollama")
             assert health1 == ProviderHealth.HEALTHY
-            
+
             # Second call should use cache (no API call)
             health2 = await factory.check_provider_health("ollama")
             assert health2 == ProviderHealth.HEALTHY
-            
+
             # Should only have called the API once
             assert mock_session.get.call_count == 1
 
@@ -282,11 +283,11 @@ class TestHealthChecking:
         # Add some cached health status
         factory._health_cache["ollama"] = ProviderHealth.HEALTHY
         factory._health_cache["vllm"] = ProviderHealth.DEGRADED
-        
+
         assert len(factory._health_cache) == 2
-        
+
         factory.clear_health_cache()
-        
+
         assert len(factory._health_cache) == 0
 
     @pytest.mark.asyncio
@@ -296,16 +297,16 @@ class TestHealthChecking:
             mock_response = AsyncMock()
             mock_response.status = 200
             mock_response.__aenter__.return_value = mock_response
-            
+
             mock_session = AsyncMock()
             mock_session.get.return_value = mock_response
             mock_session.__aenter__.return_value = mock_session
             mock_session.__aexit__.return_value = None
-            
+
             mock_session_class.return_value = mock_session
-            
+
             health_status = await factory.get_all_provider_health()
-            
+
             assert "openai" in health_status
             assert "ollama" in health_status
             assert "vllm" in health_status
@@ -321,9 +322,9 @@ class TestFailoverLogic:
         # Mock Ollama as unavailable
         with patch.object(factory, 'check_provider_health', new_callable=AsyncMock) as mock_health:
             mock_health.return_value = ProviderHealth.UNAVAILABLE
-            
+
             service = await factory.create_llm_service(ollama_config)
-            
+
             # Should have created OpenAI service as fallback
             assert isinstance(service, OpenAILLMService)
             assert service.config.provider == "openai"
@@ -334,9 +335,9 @@ class TestFailoverLogic:
         # Mock vLLM as unavailable
         with patch.object(factory, 'check_provider_health', new_callable=AsyncMock) as mock_health:
             mock_health.return_value = ProviderHealth.UNAVAILABLE
-            
+
             service = await factory.create_llm_service(vllm_config)
-            
+
             # Should have created OpenAI service as fallback
             assert isinstance(service, OpenAILLMService)
             assert service.config.provider == "openai"
@@ -345,13 +346,13 @@ class TestFailoverLogic:
     async def test_failover_disabled(self, ollama_config):
         """Test that failover can be disabled."""
         factory = LLMProviderFactory(enable_failover=False)
-        
+
         # Mock Ollama as unavailable
         with patch.object(factory, 'check_provider_health', new_callable=AsyncMock) as mock_health:
             with patch.object(factory, '_create_provider', new_callable=AsyncMock) as mock_create:
                 mock_health.return_value = ProviderHealth.UNAVAILABLE
                 mock_create.side_effect = RuntimeError("Provider unavailable")
-                
+
                 # Should raise error instead of failing over
                 with pytest.raises(RuntimeError, match="Failed to create LLM provider"):
                     await factory.create_llm_service(ollama_config)
@@ -364,9 +365,9 @@ class TestFailoverLogic:
             with patch.object(OllamaLLMService, 'check_model_availability', new_callable=AsyncMock) as mock_check:
                 mock_health.return_value = ProviderHealth.HEALTHY
                 mock_check.return_value = True
-                
+
                 service = await factory.create_llm_service(ollama_config)
-                
+
                 # Should have Ollama service with OpenAI fallback
                 assert isinstance(service, OllamaLLMService)
                 assert service.fallback_service is not None
@@ -376,7 +377,7 @@ class TestFailoverLogic:
     async def test_openai_no_fallback(self, factory, openai_config):
         """Test that OpenAI has no fallback service."""
         service = await factory.create_llm_service(openai_config)
-        
+
         # OpenAI should not have a fallback
         assert not hasattr(service, 'fallback_service') or service.fallback_service is None
 
@@ -386,13 +387,13 @@ class TestFailoverLogic:
         provider_config = {
             "fallback_model": "gpt-3.5-turbo",
         }
-        
+
         # Mock Ollama as unavailable
         with patch.object(factory, 'check_provider_health', new_callable=AsyncMock) as mock_health:
             mock_health.return_value = ProviderHealth.UNAVAILABLE
-            
+
             service = await factory.create_llm_service(ollama_config, provider_config)
-            
+
             # Should have created OpenAI service with custom model
             assert isinstance(service, OpenAILLMService)
             assert service.config.model == "gpt-3.5-turbo"
@@ -405,7 +406,7 @@ class TestFailoverLogic:
             with patch.object(factory, '_create_provider', new_callable=AsyncMock) as mock_create:
                 mock_health.return_value = ProviderHealth.UNAVAILABLE
                 mock_create.side_effect = Exception("Provider creation failed")
-                
+
                 with pytest.raises(RuntimeError, match="All LLM providers failed"):
                     await factory.create_llm_service(ollama_config)
 
@@ -424,16 +425,16 @@ class TestEdgeCases:
         """Test that provider names are case-insensitive in factory."""
         # Factory handles case-insensitivity, not LLMConfig
         config_lower = LLMConfig(provider="openai", model="gpt-4")
-        
+
         service = await factory.create_llm_service(config_lower)
-        
+
         assert isinstance(service, OpenAILLMService)
 
     @pytest.mark.asyncio
     async def test_factory_initialization_defaults(self):
         """Test factory initialization with default values."""
         factory = LLMProviderFactory()
-        
+
         assert factory.openai_api_key is None
         assert factory.ollama_base_url == "http://localhost:11434"
         assert factory.vllm_base_url == "http://localhost:8000"
@@ -443,18 +444,18 @@ class TestEdgeCases:
     async def test_concurrent_service_creation(self, factory, openai_config, ollama_config):
         """Test creating multiple services concurrently."""
         import asyncio
-        
+
         with patch.object(factory, 'check_provider_health', new_callable=AsyncMock) as mock_health:
             with patch.object(OllamaLLMService, 'check_model_availability', new_callable=AsyncMock) as mock_check:
                 mock_health.return_value = ProviderHealth.HEALTHY
                 mock_check.return_value = True
-                
+
                 # Create services concurrently
                 services = await asyncio.gather(
                     factory.create_llm_service(openai_config),
                     factory.create_llm_service(ollama_config),
                 )
-                
+
                 assert len(services) == 2
                 assert isinstance(services[0], OpenAILLMService)
                 assert isinstance(services[1], OllamaLLMService)

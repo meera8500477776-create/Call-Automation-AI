@@ -7,9 +7,9 @@ Requirements: 7.7
 """
 
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from voice_agent.monitoring.logger import get_logger
 from voice_agent.security.encryption import EncryptionService, TokenizedText
@@ -25,8 +25,8 @@ class LogEntry:
     timestamp: datetime
     event_type: str
     session_id: str
-    data: Dict[str, Any]
-    tokenized_data: Optional[TokenizedText] = None
+    data: dict[str, Any]
+    tokenized_data: TokenizedText | None = None
 
     def __post_init__(self) -> None:
         """Ensure immutability by freezing the object."""
@@ -75,7 +75,7 @@ class AuditLogger:
     EVENT_ERROR = "error"
     EVENT_LATENCY_THRESHOLD = "latency_threshold"
 
-    def __init__(self, encryption_service: Optional[EncryptionService] = None):
+    def __init__(self, encryption_service: EncryptionService | None = None):
         """
         Initialize the audit logger.
 
@@ -84,13 +84,13 @@ class AuditLogger:
                               If None, creates a new instance.
         """
         self._encryption_service = encryption_service or EncryptionService()
-        self._logs: List[LogEntry] = []
+        self._logs: list[LogEntry] = []
 
     def log_event(
         self,
         event_type: str,
         session_id: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         tokenize_pii: bool = True,
     ) -> LogEntry:
         """
@@ -142,9 +142,9 @@ class AuditLogger:
         self,
         tool_name: str,
         session_id: str,
-        parameters: Dict[str, Any],
-        result: Dict[str, Any],
-        execution_time_ms: Optional[float] = None,
+        parameters: dict[str, Any],
+        result: dict[str, Any],
+        execution_time_ms: float | None = None,
     ) -> LogEntry:
         """
         Log an API/tool execution.
@@ -179,7 +179,7 @@ class AuditLogger:
         session_id: str,
         data_type: str,
         reason: str,
-        accessed_fields: Optional[List[str]] = None,
+        accessed_fields: list[str] | None = None,
     ) -> LogEntry:
         """
         Log PII/PHI access for compliance tracking.
@@ -210,10 +210,10 @@ class AuditLogger:
 
     def query_logs(
         self,
-        filters: Optional[Dict[str, Any]] = None,
-        date_range: Optional[DateRange] = None,
-        limit: Optional[int] = None,
-    ) -> List[LogEntry]:
+        filters: dict[str, Any] | None = None,
+        date_range: DateRange | None = None,
+        limit: int | None = None,
+    ) -> list[LogEntry]:
         """
         Query audit logs with filters.
 

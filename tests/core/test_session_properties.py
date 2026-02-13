@@ -7,10 +7,10 @@ properties of the session management system across all valid inputs.
 """
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
-from voice_agent.core import ConversationTurn, Session, SessionManager
-
+from voice_agent.core import ConversationTurn, SessionManager
 
 # Hypothesis strategies for generating valid session data
 
@@ -29,7 +29,7 @@ def conversation_turn_strategy(draw):
             "transfer_to_human"
         ])
     ))
-    
+
     # Generate parameters based on intent
     parameters = {}
     if intent == "schedule_appointment":
@@ -44,7 +44,7 @@ def conversation_turn_strategy(draw):
             parameters["appointment_id"] = draw(st.text(min_size=1, max_size=20))
         if draw(st.booleans()):
             parameters["new_date"] = draw(st.text(min_size=1, max_size=20))
-    
+
     tool_calls = draw(st.lists(
         st.sampled_from([
             "search_appointments",
@@ -54,7 +54,7 @@ def conversation_turn_strategy(draw):
         ]),
         max_size=3
     ))
-    
+
     metadata = draw(st.dictionaries(
         st.text(min_size=1, max_size=20, alphabet="abcdefghijklmnopqrstuvwxyz_"),
         st.one_of(
@@ -65,7 +65,7 @@ def conversation_turn_strategy(draw):
         ),
         max_size=5
     ))
-    
+
     return ConversationTurn(
         speaker=speaker,
         transcript=transcript,
@@ -99,18 +99,18 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Add all turns to the session
         for turn in turns:
             manager.update_context(session.session_id, turn)
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify all turns are present
         assert context is not None
         assert len(context["conversation_history"]) == len(turns)
-        
+
         # Verify turns are in the correct order
         for i, (original_turn, retrieved_turn) in enumerate(
             zip(turns, context["conversation_history"])
@@ -135,14 +135,14 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Add all turns
         for turn in turns:
             manager.update_context(session.session_id, turn)
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify turn count
         assert context["turn_count"] == len(turns)
 
@@ -159,20 +159,20 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Add all turns and collect their IDs
         turn_ids = []
         for turn in turns:
             manager.update_context(session.session_id, turn)
             turn_ids.append(turn.turn_id)
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify each turn has a unique ID
         retrieved_turn_ids = [turn.turn_id for turn in context["conversation_history"]]
         assert len(retrieved_turn_ids) == len(set(retrieved_turn_ids))
-        
+
         # Verify turn IDs match
         assert retrieved_turn_ids == turn_ids
 
@@ -192,22 +192,22 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Add first batch of turns
         for turn in turns_batch1:
             manager.update_context(session.session_id, turn)
-        
+
         # Add second batch of turns
         for turn in turns_batch2:
             manager.update_context(session.session_id, turn)
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify all turns are present in order
         all_turns = turns_batch1 + turns_batch2
         assert len(context["conversation_history"]) == len(all_turns)
-        
+
         for original_turn, retrieved_turn in zip(all_turns, context["conversation_history"]):
             assert retrieved_turn.speaker == original_turn.speaker
             assert retrieved_turn.transcript == original_turn.transcript
@@ -225,18 +225,18 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Track expected accumulated parameters
         expected_parameters = {}
-        
+
         # Add all turns and accumulate parameters
         for turn in turns:
             manager.update_context(session.session_id, turn)
             expected_parameters.update(turn.parameters)
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify accumulated parameters
         assert context["extracted_parameters"] == expected_parameters
 
@@ -253,21 +253,21 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Add all turns
         for turn in turns:
             manager.update_context(session.session_id, turn)
-        
+
         # Find the last turn with an intent
         expected_intent = None
         for turn in reversed(turns):
             if turn.intent is not None:
                 expected_intent = turn.intent
                 break
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify current intent matches the last non-None intent
         assert context["current_intent"] == expected_intent
 
@@ -284,14 +284,14 @@ class TestSessionContextPreservation:
             tenant_id="test_tenant",
             caller_id="+15551234567"
         )
-        
+
         # Add turns (may be empty list)
         for turn in turns:
             manager.update_context(session.session_id, turn)
-        
+
         # Retrieve context
         context = manager.get_context(session.session_id)
-        
+
         # Verify context is valid
         assert context is not None
         assert len(context["conversation_history"]) == len(turns)

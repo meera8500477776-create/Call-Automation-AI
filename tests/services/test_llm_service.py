@@ -7,25 +7,24 @@ voice-optimized response formatting, and data model validation.
 **Validates: Requirements 10.2, 10.3, 10.4, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6**
 """
 
+
 import pytest
-from unittest.mock import Mock, AsyncMock
-from datetime import datetime
 
 from src.voice_agent.services.llm_service import (
-    LLMService,
-    LLMConfig,
-    LLMResponse,
+    ConversationContext,
     Intent,
     IntentType,
+    LLMConfig,
+    LLMResponse,
+    LLMService,
     ToolCall,
-    ConversationContext,
 )
 
 
 # Concrete implementation for testing abstract base class
 class TestLLMService(LLMService):
     """Test implementation of abstract LLMService."""
-    
+
     async def generate_response(
         self,
         transcript: str,
@@ -35,10 +34,10 @@ class TestLLMService(LLMService):
         intent = self.classify_intent(transcript)
         parameters = self.extract_parameters(transcript, intent)
         tool_call = self.should_use_tool(intent, parameters)
-        
+
         response_text = f"I understand you want to {intent.name}"
         formatted_text = self.format_for_voice(response_text)
-        
+
         return LLMResponse(
             text=formatted_text,
             intent=intent,
@@ -87,7 +86,7 @@ class TestLLMConfig:
             temperature=0.7,
             max_tokens=150,
         )
-        
+
         assert config.provider == "openai"
         assert config.model == "gpt-4"
         assert config.temperature == 0.7
@@ -122,7 +121,7 @@ class TestLLMConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = LLMConfig(provider="openai", model="gpt-4")
-        
+
         assert config.temperature == 0.7
         assert config.max_tokens == 150
         assert config.system_prompt == ""
@@ -144,7 +143,7 @@ class TestIntent:
             requires_tool=True,
             tool_name="book_appointment",
         )
-        
+
         assert intent.name == "schedule_appointment"
         assert intent.confidence == 0.85
         assert intent.parameters == {"date": "tomorrow"}
@@ -172,7 +171,7 @@ class TestIntent:
     def test_default_parameters(self):
         """Test default parameter values."""
         intent = Intent(name="test_intent", confidence=0.8)
-        
+
         assert intent.parameters == {}
         assert intent.requires_tool is False
         assert intent.tool_name is None
@@ -190,7 +189,7 @@ class TestLLMResponse:
             parameters={"date": "tomorrow"},
             confidence=0.9,
         )
-        
+
         assert response.text == "I can help you with that."
         assert response.intent == intent
         assert response.parameters == {"date": "tomorrow"}
@@ -199,7 +198,7 @@ class TestLLMResponse:
     def test_invalid_confidence(self):
         """Test invalid confidence raises error."""
         intent = Intent(name="test_intent", confidence=0.9)
-        
+
         with pytest.raises(ValueError, match="Confidence must be between"):
             LLMResponse(
                 text="Test response",
@@ -211,7 +210,7 @@ class TestLLMResponse:
         """Test default response values."""
         intent = Intent(name="test_intent", confidence=0.9)
         response = LLMResponse(text="Test", intent=intent)
-        
+
         assert response.parameters == {}
         assert response.tool_call is None
         assert response.confidence == 1.0
@@ -233,10 +232,10 @@ class TestIntentClassification:
             "Can I book an appointment for tomorrow?",
             "I need to make an appointment",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
-            
+
             assert intent.name == IntentType.SCHEDULE_APPOINTMENT.value
             assert intent.confidence > 0.7
             assert intent.requires_tool is True
@@ -249,10 +248,10 @@ class TestIntentClassification:
             "Can I change my appointment to next week?",
             "I want to move my appointment",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
-            
+
             assert intent.name == IntentType.RESCHEDULE_APPOINTMENT.value
             assert intent.confidence > 0.7
             assert intent.requires_tool is True
@@ -265,10 +264,10 @@ class TestIntentClassification:
             "Can I delete my appointment?",
             "I want to cancel",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
-            
+
             assert intent.name == IntentType.CANCEL_APPOINTMENT.value
             assert intent.confidence > 0.7
             assert intent.requires_tool is True
@@ -281,10 +280,10 @@ class TestIntentClassification:
             "I want to view my appointments",
             "Show me my appointments",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
-            
+
             assert intent.name == IntentType.CHECK_APPOINTMENT.value
             assert intent.confidence > 0.6
             assert intent.requires_tool is True
@@ -297,10 +296,10 @@ class TestIntentClassification:
             "Can I talk to an agent?",
             "Transfer me to a person",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
-            
+
             assert intent.name == IntentType.TRANSFER_TO_HUMAN.value
             assert intent.confidence > 0.8
             assert intent.requires_tool is False
@@ -312,10 +311,10 @@ class TestIntentClassification:
             "Where are you located?",
             "Tell me about your services",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
-            
+
             assert intent.name == IntentType.GENERAL_INQUIRY.value
             assert intent.confidence > 0.5
             assert intent.requires_tool is False
@@ -327,7 +326,7 @@ class TestIntentClassification:
             "Schedule An Appointment",
             "schedule an appointment",
         ]
-        
+
         for transcript in transcripts:
             intent = llm_service.classify_intent(transcript)
             assert intent.name == IntentType.SCHEDULE_APPOINTMENT.value
@@ -348,9 +347,9 @@ class TestParameterExtraction:
             ("Schedule me for next week", "next week"),
             ("I need an appointment January 15th", "January 15th"),
         ]
-        
+
         intent = Intent(name="schedule_appointment", confidence=0.9)
-        
+
         for transcript, expected_date in test_cases:
             params = llm_service.extract_parameters(transcript, intent)
             assert "date" in params
@@ -364,9 +363,9 @@ class TestParameterExtraction:
             ("Schedule me in the morning", "morning"),
             ("I prefer afternoon", "afternoon"),
         ]
-        
+
         intent = Intent(name="schedule_appointment", confidence=0.9)
-        
+
         for transcript, expected_time in test_cases:
             params = llm_service.extract_parameters(transcript, intent)
             assert "time" in params
@@ -376,9 +375,9 @@ class TestParameterExtraction:
         """Test extracting appointment reason."""
         transcript = "I need an appointment for a checkup tomorrow"
         intent = Intent(name="schedule_appointment", confidence=0.9)
-        
+
         params = llm_service.extract_parameters(transcript, intent)
-        
+
         assert "reason" in params
         assert "checkup" in params["reason"].lower()
 
@@ -386,9 +385,9 @@ class TestParameterExtraction:
         """Test extracting multiple parameters from single transcript."""
         transcript = "I want to schedule an appointment for Monday at 2pm for a consultation"
         intent = Intent(name="schedule_appointment", confidence=0.9)
-        
+
         params = llm_service.extract_parameters(transcript, intent)
-        
+
         assert "date" in params
         assert "time" in params
         assert "reason" in params
@@ -399,9 +398,9 @@ class TestParameterExtraction:
         """Test handling transcript with no extractable parameters."""
         transcript = "I want an appointment"
         intent = Intent(name="schedule_appointment", confidence=0.9)
-        
+
         params = llm_service.extract_parameters(transcript, intent)
-        
+
         # Should return empty dict or dict without date/time
         assert isinstance(params, dict)
 
@@ -422,9 +421,9 @@ class TestToolExecutionDecisions:
             tool_name="book_appointment",
         )
         parameters = {"date": "tomorrow", "time": "2pm"}
-        
+
         tool_call = llm_service.should_use_tool(intent, parameters)
-        
+
         assert tool_call is not None
         assert tool_call.tool_name == "book_appointment"
         assert tool_call.parameters == parameters
@@ -437,9 +436,9 @@ class TestToolExecutionDecisions:
             requires_tool=False,
         )
         parameters = {}
-        
+
         tool_call = llm_service.should_use_tool(intent, parameters)
-        
+
         assert tool_call is None
 
     def test_tool_call_with_partial_parameters(self, llm_service):
@@ -451,9 +450,9 @@ class TestToolExecutionDecisions:
             tool_name="book_appointment",
         )
         parameters = {"date": "tomorrow"}  # Missing time
-        
+
         tool_call = llm_service.should_use_tool(intent, parameters)
-        
+
         # Should still create tool call (executor will validate)
         assert tool_call is not None
         assert tool_call.tool_name == "book_appointment"
@@ -467,9 +466,9 @@ class TestToolExecutionDecisions:
             tool_name="reschedule_appointment",
         )
         parameters = {"appointment_id": "123", "new_date": "Friday"}
-        
+
         tool_call = llm_service.should_use_tool(intent, parameters)
-        
+
         assert tool_call is not None
         assert tool_call.tool_name == "reschedule_appointment"
         assert tool_call.parameters == parameters
@@ -483,9 +482,9 @@ class TestToolExecutionDecisions:
             tool_name="cancel_appointment",
         )
         parameters = {"appointment_id": "456"}
-        
+
         tool_call = llm_service.should_use_tool(intent, parameters)
-        
+
         assert tool_call is not None
         assert tool_call.tool_name == "cancel_appointment"
 
@@ -501,7 +500,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing bold markdown formatting."""
         response = "This is **bold text** in the response."
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "**" not in formatted
         assert "bold text" in formatted
 
@@ -509,7 +508,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing italic markdown formatting."""
         response = "This is *italic text* in the response."
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "*" not in formatted
         assert "italic text" in formatted
 
@@ -517,7 +516,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing code markdown formatting."""
         response = "Use the `code` function here."
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "`" not in formatted
         assert "code" in formatted
 
@@ -525,7 +524,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing header markdown formatting."""
         response = "## Header Text\nSome content here."
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "#" not in formatted
         assert "Header Text" in formatted
 
@@ -533,7 +532,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing link markdown formatting."""
         response = "Visit [our website](https://example.com) for more info."
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "[" not in formatted
         assert "]" not in formatted
         assert "(" not in formatted
@@ -543,7 +542,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing bullet point formatting."""
         response = "Here are options:\n- Option one\n- Option two\n- Option three"
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "-" not in formatted or formatted.count("-") < 3
         assert "Option one" in formatted
 
@@ -551,7 +550,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing numbered list formatting."""
         response = "Steps:\n1. First step\n2. Second step\n3. Third step"
         formatted = llm_service.format_for_voice(response)
-        
+
         # Numbers at start of lines should be removed
         assert "First step" in formatted
 
@@ -559,7 +558,7 @@ class TestVoiceOptimizedFormatting:
         """Test limiting response to 3 sentences."""
         response = "First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence."
         formatted = llm_service.format_for_voice(response)
-        
+
         # Count sentences
         sentence_count = formatted.count('.') + formatted.count('!') + formatted.count('?')
         assert sentence_count <= 3
@@ -568,7 +567,7 @@ class TestVoiceOptimizedFormatting:
         """Test adding period if response doesn't end with punctuation."""
         response = "This is a response without ending punctuation"
         formatted = llm_service.format_for_voice(response)
-        
+
         assert formatted.endswith(('.', '!', '?'))
 
     def test_preserve_existing_punctuation(self, llm_service):
@@ -578,7 +577,7 @@ class TestVoiceOptimizedFormatting:
             "This ends with a question?",
             "This ends with excitement!",
         ]
-        
+
         for response in test_cases:
             formatted = llm_service.format_for_voice(response)
             assert formatted[-1] in '.!?'
@@ -587,7 +586,7 @@ class TestVoiceOptimizedFormatting:
         """Test removing table formatting."""
         response = "Here is data:\n| Column 1 | Column 2 |\n| Value 1 | Value 2 |"
         formatted = llm_service.format_for_voice(response)
-        
+
         assert "|" not in formatted
 
     def test_complex_formatting_removal(self, llm_service):
@@ -603,20 +602,20 @@ class TestVoiceOptimizedFormatting:
         Visit [our site](https://example.com) for more.
         """
         formatted = llm_service.format_for_voice(response)
-        
+
         # Should have no markdown
         assert "**" not in formatted
         assert "`" not in formatted
         assert "[" not in formatted
         assert "]" not in formatted
-        
+
         # Check that markdown headers are removed (# at start of line)
         lines = formatted.split('\n')
         for line in lines:
             stripped = line.strip()
             if stripped:
                 assert not stripped.startswith('#'), f"Header markdown not removed: '{line}'"
-        
+
         # Should preserve content
         assert "Important Information" in formatted or "key points" in formatted
 
@@ -634,7 +633,7 @@ class TestConversationContext:
             ],
             extracted_parameters={"name": "John"},
         )
-        
+
         assert context.session_id == "test_123"
         assert len(context.conversation_history) == 2
         assert context.extracted_parameters == {"name": "John"}
@@ -642,7 +641,7 @@ class TestConversationContext:
     def test_default_context_values(self):
         """Test default context values."""
         context = ConversationContext(session_id="test_123")
-        
+
         assert context.conversation_history == []
         assert context.extracted_parameters == {}
         assert context.current_intent is None
@@ -656,7 +655,7 @@ class TestLLMServiceInitialization:
     def test_initialization_with_config(self, llm_config):
         """Test service initializes with provided configuration."""
         service = TestLLMService(llm_config)
-        
+
         assert service.config == llm_config
         assert service.config.provider == "openai"
         assert service.config.model == "gpt-4"
@@ -665,9 +664,9 @@ class TestLLMServiceInitialization:
     async def test_generate_response_integration(self, llm_service, conversation_context):
         """Test complete response generation flow."""
         transcript = "I want to schedule an appointment for tomorrow at 2pm"
-        
+
         response = await llm_service.generate_response(transcript, conversation_context)
-        
+
         assert isinstance(response, LLMResponse)
         assert response.intent.name == IntentType.SCHEDULE_APPOINTMENT.value
         assert "date" in response.parameters
@@ -686,7 +685,7 @@ class TestToolCall:
             parameters={"date": "tomorrow", "time": "2pm"},
             timestamp="2024-01-15T10:30:00Z",
         )
-        
+
         assert tool_call.tool_name == "book_appointment"
         assert tool_call.parameters == {"date": "tomorrow", "time": "2pm"}
         assert tool_call.timestamp == "2024-01-15T10:30:00Z"
@@ -697,7 +696,7 @@ class TestToolCall:
             tool_name="search_appointments",
             parameters={"date": "today"},
         )
-        
+
         assert tool_call.tool_name == "search_appointments"
         assert tool_call.timestamp is None
 
@@ -708,14 +707,14 @@ class TestRequiredParameters:
     def test_get_required_parameters_for_booking(self, llm_service):
         """Test getting required parameters for booking."""
         params = llm_service._get_required_parameters("book_appointment")
-        
+
         assert "date" in params
         assert "time" in params
 
     def test_get_required_parameters_for_reschedule(self, llm_service):
         """Test getting required parameters for rescheduling."""
         params = llm_service._get_required_parameters("reschedule_appointment")
-        
+
         assert "appointment_id" in params
         assert "new_date" in params
         assert "new_time" in params
@@ -723,11 +722,11 @@ class TestRequiredParameters:
     def test_get_required_parameters_for_cancel(self, llm_service):
         """Test getting required parameters for cancellation."""
         params = llm_service._get_required_parameters("cancel_appointment")
-        
+
         assert "appointment_id" in params
 
     def test_get_required_parameters_unknown_tool(self, llm_service):
         """Test getting required parameters for unknown tool."""
         params = llm_service._get_required_parameters("unknown_tool")
-        
+
         assert params == []

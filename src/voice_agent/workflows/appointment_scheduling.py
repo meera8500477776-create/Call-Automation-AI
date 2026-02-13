@@ -9,14 +9,12 @@ Requirements: 10.7, 10.8, 3.2, 3.3
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, date, timedelta
-from typing import Optional, Dict, Any, List
+from datetime import date, timedelta
 from enum import Enum
+from typing import Any
 
-from voice_agent.adapters.fhir_adapter import FHIRAdapter, DateRange, Slot, Appointment
-from voice_agent.core.session import Session, ConversationTurn
-from voice_agent.services.llm_service import IntentType
-
+from voice_agent.adapters.fhir_adapter import DateRange, FHIRAdapter, Slot
+from voice_agent.core.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -38,18 +36,18 @@ class WorkflowStage(Enum):
 @dataclass
 class WorkflowParameters:
     """Parameters collected during the scheduling workflow."""
-    date: Optional[str] = None
-    time: Optional[str] = None
-    reason: Optional[str] = None
-    provider: Optional[str] = None
-    patient_id: Optional[str] = None
-    selected_slot: Optional[Slot] = None
-    available_slots: List[Slot] = None
-    
+    date: str | None = None
+    time: str | None = None
+    reason: str | None = None
+    provider: str | None = None
+    patient_id: str | None = None
+    selected_slot: Slot | None = None
+    available_slots: list[Slot] = None
+
     def __post_init__(self):
         if self.available_slots is None:
             self.available_slots = []
-    
+
     def is_complete(self) -> bool:
         """Check if all required parameters are collected."""
         return all([
@@ -57,8 +55,8 @@ class WorkflowParameters:
             self.time is not None,
             self.patient_id is not None
         ])
-    
-    def get_missing_parameters(self) -> List[str]:
+
+    def get_missing_parameters(self) -> list[str]:
         """Get list of missing required parameters."""
         missing = []
         if not self.date:
@@ -83,7 +81,7 @@ class AppointmentSchedulingWorkflow:
     - 3.2: FHIR adapter integration for slot search
     - 3.3: FHIR adapter integration for booking
     """
-    
+
     def __init__(self, fhir_adapter: FHIRAdapter):
         """
         Initialize the appointment scheduling workflow.
@@ -93,12 +91,12 @@ class AppointmentSchedulingWorkflow:
         """
         self.fhir_adapter = fhir_adapter
         self.logger = logging.getLogger(__name__)
-    
+
     async def process_turn(
         self,
         session: Session,
         user_transcript: str,
-        extracted_params: Dict[str, Any]
+        extracted_params: dict[str, Any]
     ) -> str:
         """
         Process a conversation turn in the scheduling workflow.
@@ -113,13 +111,13 @@ class AppointmentSchedulingWorkflow:
         """
         # Get or initialize workflow parameters
         workflow_params = self._get_workflow_params(session)
-        
+
         # Update parameters with newly extracted values
         self._update_parameters(workflow_params, extracted_params, session)
-        
+
         # Determine current stage
         current_stage = WorkflowStage(session.workflow_stage)
-        
+
         # Process based on current stage
         try:
             if current_stage == WorkflowStage.INITIAL:
@@ -146,7 +144,7 @@ class AppointmentSchedulingWorkflow:
             self.logger.error(f"Error processing workflow turn: {e}", exc_info=True)
             session.workflow_stage = WorkflowStage.FAILED.value
             return "I'm sorry, I encountered an error. Let me transfer you to someone who can help."
-    
+
     def _get_workflow_params(self, session: Session) -> WorkflowParameters:
         """Get or create workflow parameters from session."""
         if "workflow_params" not in session.metadata:
@@ -154,30 +152,30 @@ class AppointmentSchedulingWorkflow:
             patient_id = session.metadata.get("patient_id")
             session.metadata["workflow_params"] = WorkflowParameters(patient_id=patient_id)
         return session.metadata["workflow_params"]
-    
+
     def _update_parameters(
         self,
         workflow_params: WorkflowParameters,
-        extracted_params: Dict[str, Any],
+        extracted_params: dict[str, Any],
         session: Session
     ) -> None:
         """Update workflow parameters with newly extracted values."""
         if "date" in extracted_params and not workflow_params.date:
             workflow_params.date = extracted_params["date"]
             session.extracted_parameters["date"] = extracted_params["date"]
-        
+
         if "time" in extracted_params and not workflow_params.time:
             workflow_params.time = extracted_params["time"]
             session.extracted_parameters["time"] = extracted_params["time"]
-        
+
         if "reason" in extracted_params and not workflow_params.reason:
             workflow_params.reason = extracted_params["reason"]
             session.extracted_parameters["reason"] = extracted_params["reason"]
-        
+
         if "provider" in extracted_params and not workflow_params.provider:
             workflow_params.provider = extracted_params["provider"]
             session.extracted_parameters["provider"] = extracted_params["provider"]
-    
+
     async def _handle_initial(
         self,
         session: Session,
@@ -186,7 +184,7 @@ class AppointmentSchedulingWorkflow:
         """Handle initial stage - start collecting parameters."""
         # Check what we already have
         missing = workflow_params.get_missing_parameters()
-        
+
         if not workflow_params.date:
             session.workflow_stage = WorkflowStage.COLLECTING_DATE.value
             return "I'd be happy to help you schedule an appointment. What date works best for you?"
@@ -197,7 +195,7 @@ class AppointmentSchedulingWorkflow:
             # We have date and time, move to searching
             session.workflow_stage = WorkflowStage.SEARCHING_SLOTS.value
             return await self._handle_searching_slots(session, workflow_params)
-    
+
     async def _handle_collecting_date(
         self,
         session: Session,
@@ -211,7 +209,7 @@ class AppointmentSchedulingWorkflow:
         else:
             # Still need date
             return "I didn't catch the date. Could you tell me what day you'd like to schedule your appointment?"
-    
+
     async def _handle_collecting_time(
         self,
         session: Session,
@@ -230,7 +228,7 @@ class AppointmentSchedulingWorkflow:
         else:
             # Still need time
             return "What time would you prefer for your appointment?"
-    
+
     async def _handle_collecting_reason(
         self,
         session: Session,
@@ -245,7 +243,7 @@ class AppointmentSchedulingWorkflow:
             # Reason is optional, can proceed without it
             session.workflow_stage = WorkflowStage.SEARCHING_SLOTS.value
             return await self._handle_searching_slots(session, workflow_params)
-    
+
     async def _handle_searching_slots(
         self,
         session: Session,
@@ -255,41 +253,41 @@ class AppointmentSchedulingWorkflow:
         if not workflow_params.patient_id:
             session.workflow_stage = WorkflowStage.FAILED.value
             return "I'm sorry, I need your patient information to search for appointments. Let me transfer you to someone who can help."
-        
+
         try:
             # Parse date and create date range
             date_range = self._parse_date_to_range(workflow_params.date)
-            
+
             # Search for available slots
             slots = await self.fhir_adapter.find_appointments(
                 patient_id=workflow_params.patient_id,
                 date_range=date_range,
                 specialty=workflow_params.provider
             )
-            
+
             if not slots:
                 session.workflow_stage = WorkflowStage.FAILED.value
                 return f"I'm sorry, I don't see any available appointments for {workflow_params.date}. Would you like to try a different date?"
-            
+
             # Find best matching slot based on requested time
             best_slot = self._find_best_slot(slots, workflow_params.time)
             workflow_params.selected_slot = best_slot
             workflow_params.available_slots = slots
-            
+
             # Move to confirmation
             session.workflow_stage = WorkflowStage.CONFIRMING.value
-            
+
             # Format slot time for response
             slot_time = best_slot.start_time.strftime("%I:%M %p")
             slot_date = best_slot.start_time.strftime("%A, %B %d")
-            
+
             return f"I found an available appointment on {slot_date} at {slot_time}. Would you like me to book that for you?"
-            
+
         except Exception as e:
             self.logger.error(f"Error searching for slots: {e}", exc_info=True)
             session.workflow_stage = WorkflowStage.FAILED.value
             return "I'm having trouble finding available appointments right now. Let me transfer you to someone who can help."
-    
+
     async def _handle_confirming(
         self,
         session: Session,
@@ -299,7 +297,7 @@ class AppointmentSchedulingWorkflow:
         """Handle confirmation stage."""
         # Check for confirmation
         transcript_lower = user_transcript.lower()
-        
+
         if any(word in transcript_lower for word in ["yes", "yeah", "sure", "ok", "okay", "book it", "confirm"]):
             # User confirmed, proceed to booking
             session.workflow_stage = WorkflowStage.BOOKING.value
@@ -314,7 +312,7 @@ class AppointmentSchedulingWorkflow:
         else:
             # Unclear response, ask again
             return "I want to make sure I understand. Would you like me to book this appointment?"
-    
+
     async def _handle_booking(
         self,
         session: Session,
@@ -324,7 +322,7 @@ class AppointmentSchedulingWorkflow:
         if not workflow_params.selected_slot:
             session.workflow_stage = WorkflowStage.FAILED.value
             return "I'm sorry, I lost track of the appointment details. Let's start over."
-        
+
         try:
             # Book the appointment
             appointment = await self.fhir_adapter.book_appointment(
@@ -333,21 +331,21 @@ class AppointmentSchedulingWorkflow:
                 reason=workflow_params.reason or "General appointment",
                 practitioner_id=workflow_params.selected_slot.practitioner_id
             )
-            
+
             # Success!
             session.workflow_stage = WorkflowStage.COMPLETED.value
-            
+
             # Format confirmation message
             appt_time = appointment.start_time.strftime("%I:%M %p")
             appt_date = appointment.start_time.strftime("%A, %B %d")
-            
+
             return f"Perfect! I've scheduled your appointment for {appt_date} at {appt_time}. You'll receive a confirmation shortly."
-            
+
         except Exception as e:
             self.logger.error(f"Error booking appointment: {e}", exc_info=True)
             session.workflow_stage = WorkflowStage.FAILED.value
             return "I'm sorry, I had trouble booking that appointment. Let me transfer you to someone who can help."
-    
+
     def _parse_date_to_range(self, date_str: str) -> DateRange:
         """
         Parse a date string to a DateRange.
@@ -359,7 +357,7 @@ class AppointmentSchedulingWorkflow:
             DateRange for searching appointments
         """
         today = date.today()
-        
+
         # Handle relative dates
         if date_str.lower() == "today":
             return DateRange(start=today, end=today)
@@ -370,7 +368,7 @@ class AppointmentSchedulingWorkflow:
             next_week_start = today + timedelta(days=7)
             next_week_end = next_week_start + timedelta(days=6)
             return DateRange(start=next_week_start, end=next_week_end)
-        
+
         # Handle day of week (e.g., "Monday")
         weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
         date_lower = date_str.lower()
@@ -382,11 +380,11 @@ class AppointmentSchedulingWorkflow:
                     days_ahead += 7
                 target_date = today + timedelta(days=days_ahead)
                 return DateRange(start=target_date, end=target_date)
-        
+
         # Default: search next 7 days
         return DateRange(start=today, end=today + timedelta(days=7))
-    
-    def _find_best_slot(self, slots: List[Slot], preferred_time: Optional[str]) -> Slot:
+
+    def _find_best_slot(self, slots: list[Slot], preferred_time: str | None) -> Slot:
         """
         Find the best matching slot based on preferred time.
         
@@ -399,14 +397,14 @@ class AppointmentSchedulingWorkflow:
         """
         if not slots:
             raise ValueError("No slots available")
-        
+
         if not preferred_time:
             # No preference, return first slot
             return slots[0]
-        
+
         # Parse preferred time
         time_lower = preferred_time.lower()
-        
+
         # Handle time of day preferences
         if "morning" in time_lower:
             # Find slots before noon
@@ -420,7 +418,7 @@ class AppointmentSchedulingWorkflow:
             # Find slots after 5pm
             evening_slots = [s for s in slots if s.start_time.hour >= 17]
             return evening_slots[0] if evening_slots else slots[0]
-        
+
         # Try to parse specific time (e.g., "2pm", "14:00")
         try:
             # Extract hour from time string
@@ -429,18 +427,18 @@ class AppointmentSchedulingWorkflow:
             if time_match:
                 hour = int(time_match.group(1))
                 am_pm = time_match.group(3)
-                
+
                 # Convert to 24-hour format
                 if am_pm == "pm" and hour != 12:
                     hour += 12
                 elif am_pm == "am" and hour == 12:
                     hour = 0
-                
+
                 # Find closest slot to this hour
                 closest_slot = min(slots, key=lambda s: abs(s.start_time.hour - hour))
                 return closest_slot
         except Exception:
             pass
-        
+
         # Default: return first slot
         return slots[0]

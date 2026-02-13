@@ -3,10 +3,11 @@
 This file serves as a reference for writing tests in the project.
 """
 
-import pytest
-from hypothesis import given, strategies as st
 from pathlib import Path
 
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 # ============================================================================
 # UNIT TESTS
@@ -88,7 +89,7 @@ async def test_async_function() -> None:
     """Example of testing an async function."""
     async def async_add(a: int, b: int) -> int:
         return a + b
-    
+
     result = await async_add(2, 3)
     assert result == 5
 
