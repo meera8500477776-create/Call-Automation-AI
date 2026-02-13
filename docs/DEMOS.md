@@ -7,12 +7,10 @@ This directory contains demonstration videos showcasing the AI voice agent platf
 ### AI Caller Demo 1
 **File:** `demo/AI Caller (1).mp4`
 
-Demonstrates the core functionality of the AI-powered voice agent handling appointment-related calls with natural language understanding and empathetic responses.
-
 ### AI Caller Demo 2
 **File:** `demo/AI Caller (2).mp4`
 
-Showcases additional use cases and conversational flows, highlighting the platform's ability to handle complex multi-turn dialogues and intelligent rescheduling.
+Demonstrates the core functionality of the AI-powered voice agent handling appointment-related calls with natural language understanding and empathetic responses.
 
 ## Key Features Demonstrated
 
