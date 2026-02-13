@@ -7,6 +7,7 @@ Grand Prize Winner - SpinSci AI Hackathon 2025
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Hackathon: SpinSci 2025](https://img.shields.io/badge/Hackathon-SpinSci%202025-success.svg)](https://spinsci.com/)
 [![Open Source](https://img.shields.io/badge/Open%20Source-%E2%9D%A4-red.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Keerthivasan-Venkitajalam/Call-Automation)
 
 Production-grade, multi-tenant AI voice agent platform for enterprise call automation. Built with Pipecat orchestration, Twilio telephony, streaming STT/TTS services, and dual LLM strategies for ultra-low latency voice interactions.
 
