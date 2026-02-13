@@ -1,7 +1,6 @@
 # Config-Driven Voice Agent Platform
 
-🏆 Grand Prize Winner - SpinSci AI Hackathon 2025  
-📄 Licensed under MIT License
+Grand Prize Winner - SpinSci AI Hackathon 2025  
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -21,7 +20,7 @@ The platform addresses the enterprise telecommunications transformation from rig
 
 ## Hackathon Achievement
 
-This platform won the grand prize at the SpinSci AI Hackathon 2025, competing against 10 shortlisted teams from across India. The event took place on January 14-15, 2025, at T-Hub, Hyderabad.
+This platform won the grand prize at the SpinSci AI Hackathon 2025, competing against 20 shortlisted teams from across India. The event took place on January 14-15, 2025, at T-Hub, Hyderabad.
 
 ### From MVP to Production
 
@@ -115,67 +114,101 @@ The platform's configuration-driven architecture means you can deploy any of the
 The platform uses a streaming architecture with concurrent processing stages to achieve ultra-low latency voice interactions.
 
 ```mermaid
-graph TB
-    subgraph "Telephony Layer"
-        A[Twilio WebSocket/WebRTC]
-    end
-    
-    subgraph "Orchestration Layer"
-        B[Pipecat Orchestrator]
-        C[Tenant Registry]
-        D[Session Manager]
-    end
-    
-    subgraph "Voice Pipeline"
-        E[VAD Module<br/>Silero]
-        F[STT Service<br/>Deepgram Nova]
-        G[LLM Service<br/>OpenAI/Ollama/vLLM]
-        H[TTS Service<br/>ElevenLabs/OpenAI]
-    end
-    
-    subgraph "Tool Execution Layer"
-        I[Tool Executor]
-        J[FHIR Adapter<br/>Healthcare]
-        K[DMS Adapter<br/>Automotive]
-        L[Custom APIs]
-    end
-    
-    subgraph "Security & Monitoring"
-        M[Authentication Service<br/>OAuth 2.0]
-        N[Encryption Service<br/>AES-256/TLS 1.2+]
-        O[Audit Logger]
-        P[Latency Monitor]
-        Q[Observability Platform<br/>LangSmith/Helicone]
-    end
-    
-    A -->|Audio Stream| B
-    B --> C
-    B --> D
-    B --> E
-    E -->|Speech Detection| F
-    F -->|Transcript| G
-    G -->|Response Text| H
-    H -->|Audio Output| A
-    G -->|Tool Calls| I
-    I --> J
-    I --> K
-    I --> L
-    J -->|Results| G
-    K -->|Results| G
-    L -->|Results| G
-    
-    B -.->|Auth| M
-    B -.->|Encrypt| N
-    B -.->|Log| O
-    B -.->|Track| P
-    G -.->|Trace| Q
-    
-    style A fill:#e1f5ff
-    style B fill:#fff4e1
-    style G fill:#ffe1f5
-    style I fill:#e1ffe1
-    style M fill:#ffe1e1
+graph LR
+
+%% ================= LAYERS =================
+
+subgraph Telephony
+A[Twilio<br/>WebSocket / WebRTC]
+end
+
+subgraph Orchestration
+B[Pipecat<br/>Orchestrator]
+C[Tenant Registry]
+D[Session Manager]
+end
+
+subgraph "Voice AI Pipeline"
+E[VAD · Silero]
+F[STT · Deepgram]
+G[LLM · OpenAI / Ollama / vLLM]
+H[TTS · ElevenLabs / OpenAI]
+end
+
+subgraph Tools
+I[Tool Executor]
+J[FHIR Adapter]
+K[DMS Adapter]
+L[Custom APIs]
+end
+
+subgraph "Security & Observability"
+M[OAuth2 Auth]
+N[AES-256 / TLS]
+O[Audit Logs]
+P[Latency Monitor]
+Q[LangSmith / Helicone]
+end
+
+
+%% ================= FLOW =================
+
+A --> B
+B --> E
+E --> F
+F --> G
+G --> H
+H --> A
+
+B --> C
+B --> D
+
+G --> I
+I --> J
+I --> K
+I --> L
+J --> G
+K --> G
+L --> G
+
+B -.-> M
+B -.-> N
+B -.-> O
+B -.-> P
+G -.-> Q
+
+
+%% ================= DARK COLORS =================
+
+%% Telephony — Blue
+style A fill:#0d47a1,color:#ffffff,stroke:#42a5f5,stroke-width:2px
+
+%% Orchestration — Purple
+style B fill:#4a148c,color:#ffffff,stroke:#ba68c8,stroke-width:2px
+style C fill:#4a148c,color:#ffffff,stroke:#ba68c8
+style D fill:#4a148c,color:#ffffff,stroke:#ba68c8
+
+%% Voice AI — Pink core highlight
+style E fill:#880e4f,color:#ffffff,stroke:#ff80ab
+style F fill:#880e4f,color:#ffffff,stroke:#ff80ab
+style G fill:#ad1457,color:#ffffff,stroke:#ff4081,stroke-width:3px
+style H fill:#880e4f,color:#ffffff,stroke:#ff80ab
+
+%% Tools — Green
+style I fill:#1b5e20,color:#ffffff,stroke:#69f0ae,stroke-width:2px
+style J fill:#1b5e20,color:#ffffff,stroke:#69f0ae
+style K fill:#1b5e20,color:#ffffff,stroke:#69f0ae
+style L fill:#1b5e20,color:#ffffff,stroke:#69f0ae
+
+%% Security — Red
+style M fill:#7f0000,color:#ffffff,stroke:#ff5252
+style N fill:#7f0000,color:#ffffff,stroke:#ff5252
+style O fill:#7f0000,color:#ffffff,stroke:#ff5252
+style P fill:#7f0000,color:#ffffff,stroke:#ff5252
+style Q fill:#7f0000,color:#ffffff,stroke:#ff5252
+
 ```
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/8d73e733-3402-4c5f-a59c-31f1c6af8479" />
 
 ### Data Flow
 
@@ -594,15 +627,13 @@ We welcome contributions from the community! This project started as a hackathon
 
 This project would not have been possible without:
 - SpinSci Technologies for hosting the hackathon and providing the problem statement
-- Amrita School of Artificial Intelligence, Coimbatore, Amrita Vishwa Vidyapeetham
 - T-Hub, Hyderabad for providing the venue and infrastructure
 - The open-source community for the amazing tools and libraries we built upon
 
 ## License
 
-Copyright (c) 2025 SpinSci AI Hackathon 2025 Team
+Copyright (c) 2025 SpinSci AI Hackathon 2025 VisioneoAI Innovators Team
 
-Licensed under the MIT License. See [LICENCE](LICENSE).
- file for details.
+Licensed under the MIT License. See [LICENCE](LICENSE) file for details.
 
 This software is open source and free to use, modify, and distribute under the terms of the MIT License.
