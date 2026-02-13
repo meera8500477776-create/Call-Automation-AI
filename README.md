@@ -634,6 +634,6 @@ This project would not have been possible without:
 
 Copyright (c) 2025 SpinSci AI Hackathon 2025 VisioneoAI Innovators Team
 
-Licensed under the MIT License. See [LICENCE](LICENSE) file for details.
+Licensed under the MIT License. See [LICENSE](LICENSE) file for details.
 
 This software is open source and free to use, modify, and distribute under the terms of the MIT License.
