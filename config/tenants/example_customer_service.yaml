@@ -1,0 +1,91 @@
+# Example Generic Customer Service Tenant Configuration
+
+tenant_id: customer_service_001
+
+persona:
+  name: "Alex"
+  voice_id: "elevenlabs_voice_id_here"
+  system_prompt: |
+    You are Alex, a friendly and helpful customer service representative.
+    You assist customers with inquiries, support requests, and general questions.
+    Always be polite, patient, and solution-oriented.
+    Keep responses under 3 sentences.
+    Never use markdown, tables, or bullet points.
+    If you don't know something, say so clearly rather than guessing.
+    If the issue requires escalation, offer to transfer to a specialist.
+
+llm:
+  provider: "openai"  # openai, ollama, vllm
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 150
+
+tts:
+  provider: "elevenlabs"  # elevenlabs, openai
+  voice_settings:
+    stability: 0.6
+    similarity_boost: 0.75
+    style: 0.5
+    use_speaker_boost: true
+
+tools:
+  - name: "lookup_order"
+    type: "custom_api"
+    description: "Look up customer order information"
+    endpoint: "https://api.example.com/orders"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["order_id"]
+      properties:
+        order_id:
+          type: "string"
+          description: "Order ID or order number"
+
+  - name: "check_account_status"
+    type: "custom_api"
+    description: "Check customer account status"
+    endpoint: "https://api.example.com/accounts"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["customer_id"]
+      properties:
+        customer_id:
+          type: "string"
+          description: "Customer ID or email"
+
+  - name: "create_support_ticket"
+    type: "custom_api"
+    description: "Create a support ticket for complex issues"
+    endpoint: "https://api.example.com/tickets"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["customer_id", "issue_description", "priority"]
+      properties:
+        customer_id:
+          type: "string"
+        issue_description:
+          type: "string"
+        priority:
+          type: "string"
+          enum: ["low", "medium", "high", "urgent"]
+
+knowledge_bases:
+  - type: "vector_db"
+    source: "faq_knowledge_base.pdf"
+    description: "Frequently asked questions and common solutions"
+  - type: "vector_db"
+    source: "product_documentation.pdf"
+    description: "Product features and documentation"
+
+constraints:
+  max_call_duration: 900  # 15 minutes
+  response_brevity: 3  # max sentences per response
+  enable_barge_in: true
+  transfer_to_human_on_error: true
+  max_transfer_attempts: 2

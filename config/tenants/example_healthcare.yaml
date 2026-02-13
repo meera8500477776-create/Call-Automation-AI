@@ -1,0 +1,115 @@
+# Example Healthcare Clinic Tenant Configuration
+
+tenant_id: healthcare_clinic_001
+
+persona:
+  name: "Sarah"
+  voice_id: "elevenlabs_voice_id_here"
+  system_prompt: |
+    You are Sarah, a friendly and professional medical receptionist for a healthcare clinic.
+    You help patients schedule, reschedule, and cancel appointments.
+    Always be empathetic, clear, and concise in your responses.
+    Keep responses under 3 sentences.
+    Never use markdown, tables, or bullet points.
+    If you don't know something, say so clearly rather than guessing.
+
+llm:
+  provider: "openai"  # openai, ollama, vllm
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 150
+
+tts:
+  provider: "elevenlabs"  # elevenlabs, openai
+  voice_settings:
+    stability: 0.5
+    similarity_boost: 0.75
+    style: 0.5
+    use_speaker_boost: true
+
+tools:
+  - name: "search_appointments"
+    type: "fhir"
+    description: "Search for available appointment slots"
+    endpoint: "https://fhir.epic.com/api/FHIR/R4"
+    auth_type: "oauth2"
+    scopes:
+      - "patient/Appointment.read"
+    parameters_schema:
+      type: "object"
+      required: ["patient_id", "date_range"]
+      properties:
+        patient_id:
+          type: "string"
+        date_range:
+          type: "object"
+          properties:
+            start:
+              type: "string"
+              format: "date"
+            end:
+              type: "string"
+              format: "date"
+        specialty:
+          type: "string"
+
+  - name: "book_appointment"
+    type: "fhir"
+    description: "Book a new appointment"
+    endpoint: "https://fhir.epic.com/api/FHIR/R4"
+    auth_type: "oauth2"
+    scopes:
+      - "patient/Appointment.write"
+    parameters_schema:
+      type: "object"
+      required: ["patient_id", "slot_id", "reason"]
+      properties:
+        patient_id:
+          type: "string"
+        slot_id:
+          type: "string"
+        reason:
+          type: "string"
+
+  - name: "reschedule_appointment"
+    type: "fhir"
+    description: "Reschedule an existing appointment"
+    endpoint: "https://fhir.epic.com/api/FHIR/R4"
+    auth_type: "oauth2"
+    scopes:
+      - "patient/Appointment.write"
+    parameters_schema:
+      type: "object"
+      required: ["appointment_id", "new_slot_id"]
+      properties:
+        appointment_id:
+          type: "string"
+        new_slot_id:
+          type: "string"
+
+  - name: "cancel_appointment"
+    type: "fhir"
+    description: "Cancel an appointment"
+    endpoint: "https://fhir.epic.com/api/FHIR/R4"
+    auth_type: "oauth2"
+    scopes:
+      - "patient/Appointment.write"
+    parameters_schema:
+      type: "object"
+      required: ["appointment_id", "reason"]
+      properties:
+        appointment_id:
+          type: "string"
+        reason:
+          type: "string"
+
+knowledge_bases:
+  - type: "vector_db"
+    source: "clinic_policies.pdf"
+    description: "Clinic policies and procedures"
+
+constraints:
+  max_call_duration: 600  # seconds
+  response_brevity: 3  # max sentences per response
+  enable_barge_in: true
+  transfer_to_human_on_error: true

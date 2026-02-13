@@ -1,0 +1,113 @@
+# Example Automotive Dealership Tenant Configuration
+
+tenant_id: automotive_dealer_001
+
+persona:
+  name: "Mike"
+  voice_id: "elevenlabs_voice_id_here"
+  system_prompt: |
+    You are Mike, a friendly service advisor at an automotive dealership.
+    You help customers schedule service appointments, get maintenance quotes, and handle emergency situations.
+    Always be helpful, professional, and efficient.
+    Keep responses under 3 sentences.
+    Never use markdown, tables, or bullet points.
+    If you don't know something, say so clearly rather than guessing.
+
+llm:
+  provider: "openai"
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 150
+
+tts:
+  provider: "elevenlabs"
+  voice_settings:
+    stability: 0.6
+    similarity_boost: 0.75
+    style: 0.4
+    use_speaker_boost: true
+
+tools:
+  - name: "find_service_slots"
+    type: "dms"
+    description: "Find available service appointment slots"
+    endpoint: "https://dms.dealership.com/api/v1"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["vehicle_id", "service_type", "date_range"]
+      properties:
+        vehicle_id:
+          type: "string"
+          description: "VIN or customer vehicle ID"
+        service_type:
+          type: "string"
+          enum: ["oil_change", "tire_rotation", "diagnostics", "maintenance", "repair"]
+        date_range:
+          type: "object"
+          properties:
+            start:
+              type: "string"
+              format: "date"
+            end:
+              type: "string"
+              format: "date"
+
+  - name: "book_service"
+    type: "dms"
+    description: "Book a service appointment"
+    endpoint: "https://dms.dealership.com/api/v1"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["vehicle_id", "slot_id", "service_type"]
+      properties:
+        vehicle_id:
+          type: "string"
+        slot_id:
+          type: "string"
+        service_type:
+          type: "string"
+
+  - name: "get_maintenance_quote"
+    type: "dms"
+    description: "Get a quote for maintenance service"
+    endpoint: "https://dms.dealership.com/api/v1"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["vehicle_id", "service_type"]
+      properties:
+        vehicle_id:
+          type: "string"
+        service_type:
+          type: "string"
+
+  - name: "triage_emergency"
+    type: "dms"
+    description: "Assess emergency severity and provide guidance"
+    endpoint: "https://dms.dealership.com/api/v1"
+    auth_type: "api_key"
+    api_key_name: "X-API-Key"
+    parameters_schema:
+      type: "object"
+      required: ["vehicle_id", "issue_description"]
+      properties:
+        vehicle_id:
+          type: "string"
+        issue_description:
+          type: "string"
+
+knowledge_bases:
+  - type: "vector_db"
+    source: "service_procedures.pdf"
+    description: "Service procedures and pricing"
+
+constraints:
+  max_call_duration: 600
+  response_brevity: 3
+  enable_barge_in: true
+  transfer_to_human_on_error: true
