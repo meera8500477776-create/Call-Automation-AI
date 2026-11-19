@@ -345,9 +345,9 @@ class LLMService(ABC):
             Voice-optimized response text
         """
         # Remove markdown formatting
-        text = re.sub(r'\*\*(.+?)\*\*', r'\1', response)  # Bold
-        text = re.sub(r'\*(.+?)\*', r'\1', text)  # Italic
-        text = re.sub(r'`(.+?)`', r'\1', text)  # Code
+        # Strip emphasis/code delimiters directly. Pair-based expressions can
+        # leave markers behind when model output nests or crosses delimiters.
+        text = re.sub(r'[*`]', '', response)
         text = re.sub(r'^\s*#+\s*', '', text, flags=re.MULTILINE)  # Headers (with optional leading whitespace)
         text = re.sub(r'\[(.+?)\]\(.+?\)', r'\1', text)  # Links
 

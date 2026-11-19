@@ -221,10 +221,14 @@ class TestHealthChecking:
     async def test_ollama_health_check_unavailable(self, factory):
         """Test unavailable Ollama health check."""
         with patch('aiohttp.ClientSession') as mock_session_class:
-            mock_session = AsyncMock()
-            mock_session.get.side_effect = Exception("Connection refused")
-            mock_session.__aenter__.return_value = mock_session
-            mock_session.__aexit__.return_value = None
+            mock_request = MagicMock()
+            mock_request.__aenter__ = AsyncMock(
+                side_effect=Exception("Connection refused")
+            )
+            mock_session = MagicMock()
+            mock_session.get.return_value = mock_request
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
 
             mock_session_class.return_value = mock_session
 
@@ -294,14 +298,15 @@ class TestHealthChecking:
     async def test_get_all_provider_health(self, factory):
         """Test getting health status for all providers."""
         with patch('aiohttp.ClientSession') as mock_session_class:
-            mock_response = AsyncMock()
+            mock_response = MagicMock()
             mock_response.status = 200
-            mock_response.__aenter__.return_value = mock_response
+            mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_response.__aexit__ = AsyncMock(return_value=None)
 
-            mock_session = AsyncMock()
+            mock_session = MagicMock()
             mock_session.get.return_value = mock_response
-            mock_session.__aenter__.return_value = mock_session
-            mock_session.__aexit__.return_value = None
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
 
             mock_session_class.return_value = mock_session
 

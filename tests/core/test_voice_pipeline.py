@@ -6,6 +6,7 @@ components for real-time voice processing with barge-in support.
 """
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import pytest
@@ -132,6 +133,10 @@ class TestVoicePipelineInitialization:
     @pytest.mark.asyncio
     async def test_pipeline_initialization(self, pipeline):
         """Test pipeline initialization connects all components."""
+        pipeline._audio_buffer.extend(b"\x01\x00")
+        pipeline._vad_module._audio_buffer.extend(b"\x01\x00")
+        pipeline._vad_module._current_timestamp = 1.0
+
         # Mock component connections
         with patch.object(pipeline._stt_service, 'connect', new_callable=AsyncMock) as mock_connect, \
              patch.object(pipeline._tts_factory, 'create_tts_service', new_callable=AsyncMock) as mock_tts:
@@ -142,6 +147,9 @@ class TestVoicePipelineInitialization:
 
             assert pipeline.state == PipelineState.ACTIVE
             assert pipeline.is_active
+            assert pipeline._audio_buffer == bytearray()
+            assert pipeline._vad_module._audio_buffer == bytearray()
+            assert pipeline._vad_module._current_timestamp == 0.0
             mock_connect.assert_called_once_with("test_session_123")
             mock_tts.assert_called_once()
 
@@ -197,6 +205,56 @@ class TestVoicePipelineCallbacks:
 
 class TestVoicePipelineAudioProcessing:
     """Test voice pipeline audio processing."""
+
+    @pytest.mark.asyncio
+    async def test_vad_frames_preserve_leftovers_and_stt_order(self):
+        """Device callback boundaries do not alter VAD framing or STT audio."""
+        pipeline = object.__new__(VoicePipeline)
+        pipeline._state = PipelineState.ACTIVE
+        pipeline._audio_buffer = bytearray()
+        pipeline._audio_queue = asyncio.Queue(maxsize=8)
+        pipeline._streaming_config = SimpleNamespace(backpressure_threshold=0.8)
+        pipeline._barge_in_enabled = False
+        pipeline._is_agent_speaking = False
+
+        vad_result = VADResult(is_speech=False, confidence=0.0, timestamp=0.032)
+        pipeline._vad_module = SimpleNamespace(
+            config=SimpleNamespace(window_size_samples=512),
+            process_audio=Mock(return_value=vad_result),
+        )
+        pipeline._stt_service = SimpleNamespace(
+            is_connected=True,
+            send_audio=AsyncMock(),
+        )
+
+        first = b"\x01\x00" * 300
+        second = b"\x02\x00" * 400
+        third = b"\x03\x00" * 324
+
+        await pipeline.process_audio_chunk(first)
+        assert pipeline._audio_buffer == first
+        await pipeline.process_audio_chunk(second)
+        await pipeline.process_audio_chunk(third)
+
+        expected_audio = first + second + third
+        assert pipeline._vad_module.process_audio.call_count == 2
+        first_frame, second_frame = [
+            call.args[0] for call in pipeline._vad_module.process_audio.call_args_list
+        ]
+        assert len(first_frame) == len(second_frame) == 512 * 2
+        assert first_frame + second_frame == expected_audio
+        assert pipeline._audio_buffer == bytearray()
+        assert [call.args[0] for call in pipeline._stt_service.send_audio.await_args_list] == [
+            first, second, third
+        ]
+
+    @pytest.mark.asyncio
+    async def test_odd_pcm_bytes_are_rejected(self):
+        pipeline = object.__new__(VoicePipeline)
+        pipeline._state = PipelineState.ACTIVE
+
+        with pytest.raises(ValueError, match="complete 16-bit PCM samples"):
+            await pipeline.process_audio_chunk(b"\x00")
 
     @pytest.mark.asyncio
     async def test_process_audio_chunk_not_active(self, pipeline):

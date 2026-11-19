@@ -75,6 +75,7 @@ class VADModule:
         self.config = config
         self._state = SpeechState.SILENCE
         self._current_timestamp = 0.0
+        self._audio_buffer = bytearray()
 
         # Callback handlers
         self._speech_start_callback: Callable[[float], None] | None = None
@@ -175,52 +176,63 @@ class VADModule:
         if not audio_chunk:
             raise ValueError("Audio chunk cannot be empty")
 
+        if len(audio_chunk) % 2:
+            raise ValueError("Audio chunk must contain complete 16-bit PCM samples")
+
         if self._model is None:
             raise RuntimeError("VAD model not loaded")
 
         try:
-            # Convert bytes to numpy array (16-bit PCM)
-            audio_int16 = np.frombuffer(audio_chunk, dtype=np.int16)
+            self._audio_buffer.extend(audio_chunk)
+            frame_bytes = self.config.window_size_samples * 2
+            result = None
+            while len(self._audio_buffer) >= frame_bytes:
+                frame = bytes(self._audio_buffer[:frame_bytes])
+                del self._audio_buffer[:frame_bytes]
+                result = self._process_frame(frame)
 
-            # Convert to float32 normalized to [-1, 1]
-            audio_float32 = audio_int16.astype(np.float32) / 32768.0
+            if result is not None:
+                pending_samples = len(self._audio_buffer) // 2
+                return VADResult(
+                    is_speech=result.is_speech,
+                    confidence=result.confidence,
+                    timestamp=self._current_timestamp + pending_samples / self.config.sample_rate,
+                )
 
-            # Convert to torch tensor
-            audio_tensor = torch.from_numpy(audio_float32)
-
-            # Get speech probability from model
-            with torch.no_grad():
-                speech_prob = self._model(audio_tensor, self.config.sample_rate).item()
-
-            # Determine if speech is detected
-            is_speech = speech_prob >= self.config.threshold
-
-            # Update timestamp
-            chunk_duration = len(audio_int16) / self.config.sample_rate
-            self._current_timestamp += chunk_duration
-
-            # Create result
-            result = VADResult(
-                is_speech=is_speech,
-                confidence=speech_prob,
-                timestamp=self._current_timestamp,
+            # Keep incomplete samples for the next streaming call. The
+            # provisional result reports the buffered audio position without
+            # invoking Silero with an unsupported frame length.
+            pending_samples = len(self._audio_buffer) // 2
+            return VADResult(
+                is_speech=self.is_speech_active,
+                confidence=0.0,
+                timestamp=self._current_timestamp + pending_samples / self.config.sample_rate,
             )
-
-            # Update state and trigger callbacks
-            self._update_state(result)
-
-            logger.debug(
-                "VAD processed: is_speech=%s, confidence=%.3f, timestamp=%.3f",
-                is_speech,
-                speech_prob,
-                self._current_timestamp,
-            )
-
-            return result
 
         except Exception as e:
             logger.error("Error processing audio chunk: %s", str(e))
             raise
+
+    def _process_frame(self, frame: bytes) -> VADResult:
+        """Run Silero on one configured frame (512 samples at 16 kHz)."""
+        audio_int16 = np.frombuffer(frame, dtype=np.int16)
+        audio_float32 = audio_int16.astype(np.float32) / 32768.0
+        audio_tensor = torch.from_numpy(audio_float32)
+
+        with torch.no_grad():
+            speech_prob = self._model(audio_tensor, self.config.sample_rate).item()
+
+        is_speech = speech_prob >= self.config.threshold
+        self._current_timestamp += len(audio_int16) / self.config.sample_rate
+        result = VADResult(is_speech, speech_prob, self._current_timestamp)
+        self._update_state(result)
+        logger.debug(
+            "VAD processed: is_speech=%s, confidence=%.3f, timestamp=%.3f",
+            is_speech,
+            speech_prob,
+            self._current_timestamp,
+        )
+        return result
 
     def _update_state(self, result: VADResult) -> None:
         """
@@ -282,6 +294,7 @@ class VADModule:
         self._speech_frames = 0
         self._silence_frames = 0
         self._speech_start_time = None
+        self._audio_buffer.clear()
 
         logger.info("VAD state reset")
 

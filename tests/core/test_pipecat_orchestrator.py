@@ -373,3 +373,11 @@ class TestPipecatOrchestrator:
         assert voice_config.voice_id == "test_voice_123"
         assert voice_config.stability == 0.5
         assert voice_config.similarity_boost == 0.75
+
+    def test_placeholder_elevenlabs_voice_rejected_during_tenant_setup(
+        self, orchestrator, mock_tenant_config
+    ):
+        mock_tenant_config.persona.voice_id = "elevenlabs_voice_id_here"
+
+        with pytest.raises(ValueError, match="real ElevenLabs voice ID"):
+            orchestrator._build_voice_config(mock_tenant_config)

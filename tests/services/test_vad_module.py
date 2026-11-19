@@ -141,6 +141,33 @@ class TestSpeechDetection:
         assert result.is_speech is True
         assert result.confidence == 0.5
 
+    def test_large_audio_is_framed_for_silero(self, vad_module, mock_silero_model):
+        """A 4096-sample input is delivered to Silero as eight 512-sample frames."""
+        audio = np.zeros(4096, dtype=np.int16).tobytes()
+
+        result = vad_module.process_audio(audio)
+
+        assert result.timestamp == pytest.approx(4096 / 16000)
+        assert mock_silero_model.call_count == 8
+        assert all(
+            call.args[0].numel() == vad_module.config.window_size_samples
+            for call in mock_silero_model.call_args_list
+        )
+
+    def test_audio_remainder_is_preserved_between_calls(self, vad_module, mock_silero_model):
+        """Sub-frame samples are retained and joined to the next audio callback."""
+        first = np.zeros(200, dtype=np.int16).tobytes()
+        second = np.zeros(312, dtype=np.int16).tobytes()
+
+        provisional = vad_module.process_audio(first)
+        assert provisional.timestamp == pytest.approx(200 / 16000)
+        mock_silero_model.assert_not_called()
+
+        result = vad_module.process_audio(second)
+        assert result.timestamp == pytest.approx(512 / 16000)
+        mock_silero_model.assert_called_once()
+        assert mock_silero_model.call_args.args[0].numel() == 512
+
     def test_process_empty_audio_raises_error(self, vad_module):
         """Test processing empty audio chunk raises ValueError."""
         with pytest.raises(ValueError, match="Audio chunk cannot be empty"):
@@ -343,6 +370,7 @@ class TestStateManagement:
         assert vad_module._speech_frames == 0
         assert vad_module._silence_frames == 0
         assert vad_module._speech_start_time is None
+        assert vad_module._audio_buffer == bytearray()
 
 
 class TestEdgeCases:

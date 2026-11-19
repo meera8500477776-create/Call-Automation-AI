@@ -15,7 +15,7 @@ from typing import Any
 
 from ..config.registry import TenantRegistry
 from ..config.schema import TenantConfig
-from ..services.elevenlabs_tts_service import VoiceConfig
+from ..services.elevenlabs_tts_service import VoiceConfig, validate_voice_config
 from ..services.llm_factory import LLMProviderFactory
 from ..services.stt_service import STTConfig
 from ..services.vad_module import VADConfig
@@ -130,7 +130,7 @@ class PipecatOrchestrator:
 
     def _build_voice_config(self, tenant_config: TenantConfig) -> VoiceConfig:
         """Build voice configuration from tenant config."""
-        return VoiceConfig(
+        voice_config = VoiceConfig(
             provider=getattr(tenant_config.tts, 'provider', "elevenlabs"),
             voice_id=tenant_config.persona.voice_id,
             stability=getattr(tenant_config.tts, 'stability', 0.5),
@@ -138,6 +138,8 @@ class PipecatOrchestrator:
             style=getattr(tenant_config.tts, 'style', 0.0),
             use_speaker_boost=getattr(tenant_config.tts, 'use_speaker_boost', True),
         )
+        validate_voice_config(voice_config)
+        return voice_config
 
     async def start_session(
         self,

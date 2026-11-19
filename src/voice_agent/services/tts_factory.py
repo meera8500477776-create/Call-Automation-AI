@@ -18,6 +18,7 @@ from .elevenlabs_tts_service import (
     ElevenLabsTTSService,
     TTSConfig,
     VoiceConfig,
+    validate_voice_config,
 )
 from .openai_tts_service import OpenAITTSConfig, OpenAITTSService
 
@@ -91,6 +92,8 @@ class TTSProviderFactory:
             RuntimeError: If provider creation fails and no fallback available
         """
         provider_config = provider_config or {}
+
+        validate_voice_config(voice_config)
 
         # Check provider health
         health = await self.check_provider_health(voice_config.provider)

@@ -250,6 +250,67 @@ class TestConnectionManagement:
             mock_connection.__aexit__.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_disconnect_exits_sdk_context_manager_not_socket(self, stt_service):
+        """Deepgram 7 returns a socket inside an async context manager."""
+        with patch('src.voice_agent.services.stt_service.AsyncDeepgramClient') as mock_client_class:
+            socket = Mock()
+            socket.on = Mock()
+            listening_started = asyncio.Event()
+
+            async def keep_listening():
+                listening_started.set()
+                await asyncio.Event().wait()
+
+            socket.start_listening = AsyncMock(side_effect=keep_listening)
+            manager = AsyncMock()
+            manager.__aenter__.return_value = socket
+
+            mock_v1 = Mock()
+            mock_v1.connect.return_value = manager
+            mock_client = Mock()
+            mock_client.listen.v1 = mock_v1
+            mock_client_class.return_value = mock_client
+
+            await stt_service.connect("context-manager-session")
+            await listening_started.wait()
+            await stt_service.disconnect()
+
+            manager.__aexit__.assert_awaited_once_with(None, None, None)
+            assert not hasattr(socket, "__aexit__")
+            assert stt_service._connection_context is None
+            assert stt_service._connection is None
+
+    @pytest.mark.asyncio
+    async def test_listener_failure_closes_sdk_context(self, stt_service):
+        """Unexpected listener termination reports the error and releases the socket."""
+        error_received = asyncio.Event()
+        stt_service.on_error(lambda error: error_received.set())
+
+        with patch('src.voice_agent.services.stt_service.AsyncDeepgramClient') as mock_client_class:
+            socket = Mock()
+            socket.on = Mock()
+            socket.start_listening = AsyncMock(side_effect=RuntimeError("listener failed"))
+            manager = AsyncMock()
+            manager.__aenter__.return_value = socket
+
+            mock_v1 = Mock()
+            mock_v1.connect.return_value = manager
+            mock_client = Mock()
+            mock_client.listen.v1 = mock_v1
+            mock_client_class.return_value = mock_client
+
+            await stt_service.connect("failed-listener-session")
+            await asyncio.wait_for(error_received.wait(), timeout=1)
+            cleanup = stt_service._connection_cleanup_task
+            assert cleanup is not None
+            await cleanup
+
+            assert stt_service.state == ConnectionState.ERROR
+            manager.__aexit__.assert_awaited_once()
+            assert stt_service._connection is None
+            assert stt_service._connection_context is None
+
+    @pytest.mark.asyncio
     async def test_disconnect_when_not_connected(self, stt_service):
         """Test disconnecting when not connected is safe."""
         await stt_service.disconnect()

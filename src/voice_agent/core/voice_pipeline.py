@@ -223,6 +223,9 @@ class VoicePipeline:
             logger.warning("Pipeline already initialized")
             return
 
+        # New sessions start with no audio/VAD samples carried over.
+        self._audio_buffer.clear()
+        self._vad_module.reset()
         self._state = PipelineState.INITIALIZING
 
         try:
@@ -458,6 +461,8 @@ class VoicePipeline:
 
         if not audio_data:
             raise ValueError("Audio data cannot be empty")
+        if len(audio_data) % 2:
+            raise ValueError("Audio data must contain complete 16-bit PCM samples")
 
         try:
             # Check for backpressure
@@ -469,10 +474,13 @@ class VoicePipeline:
             # Add to buffer
             self._audio_buffer.extend(audio_data)
 
-            # Process buffer in chunks
-            while len(self._audio_buffer) >= self._streaming_config.audio_chunk_size:
-                chunk = bytes(self._audio_buffer[:self._streaming_config.audio_chunk_size])
-                del self._audio_buffer[:self._streaming_config.audio_chunk_size]
+            # Silero 16 kHz expects fixed 512-sample (1024-byte PCM16) frames.
+            # Preserve partial samples between callbacks; never drop or pad a
+            # microphone frame just because the device callback boundary differs.
+            vad_frame_bytes = self._vad_module.config.window_size_samples * 2
+            while len(self._audio_buffer) >= vad_frame_bytes:
+                chunk = bytes(self._audio_buffer[:vad_frame_bytes])
+                del self._audio_buffer[:vad_frame_bytes]
 
                 # Process through VAD for speech detection
                 vad_result = self._vad_module.process_audio(chunk)
@@ -482,15 +490,10 @@ class VoicePipeline:
                     logger.info("Barge-in detected, interrupting agent speech")
                     await self._handle_barge_in()
 
-                # Send audio to STT service
-                if self._stt_service.is_connected:
-                    await self._stt_service.send_audio(chunk)
-
-            # Enforce max buffer size
-            if len(self._audio_buffer) > self._streaming_config.max_audio_buffer_size:
-                logger.warning("Audio buffer overflow, discarding oldest data")
-                excess = len(self._audio_buffer) - self._streaming_config.max_audio_buffer_size
-                del self._audio_buffer[:excess]
+            # Forward the original callback bytes once, unchanged and in order.
+            # STT does not share VAD's fixed frame-size requirement.
+            if self._stt_service.is_connected:
+                await self._stt_service.send_audio(audio_data)
 
             logger.debug("Processed audio chunk: %d bytes (buffer: %d bytes)",
                         len(audio_data), len(self._audio_buffer))

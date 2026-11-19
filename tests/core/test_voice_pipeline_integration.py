@@ -8,6 +8,7 @@ processing stages with mock components.
 """
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, PropertyMock, patch
 
 import pytest
@@ -563,7 +564,7 @@ class TestConcurrentProcessing:
     """Integration tests for concurrent processing stages."""
 
     @pytest.mark.asyncio
-    async def test_concurrent_llm_processing(self, initialized_pipeline):
+    async def test_concurrent_llm_processing(self):
         """
         Test concurrent LLM processing with multiple requests.
 
@@ -572,8 +573,23 @@ class TestConcurrentProcessing:
 
         **Validates: Requirements 2.2, 2.3**
         """
-        pipeline = initialized_pipeline
-        llm_service = pipeline._llm_service
+        # Construct only the LLM-processing state. Building a full pipeline
+        # here loads the Silero VAD model, which is unrelated to this test.
+        pipeline = object.__new__(VoicePipeline)
+        pipeline._streaming_config = StreamingConfig(
+            enable_concurrent_processing=False,
+            max_concurrent_llm_requests=2,
+        )
+        pipeline._llm_semaphore = asyncio.Semaphore(2)
+        pipeline._processing_lock = asyncio.Lock()
+        pipeline._context = ConversationContext(
+            session_id="concurrency-test",
+            conversation_history=[],
+            extracted_parameters={},
+        )
+        pipeline._current_metrics = LatencyMetrics()
+        pipeline._llm_response_callback = None
+        pipeline._tts_service = None
 
         # Hold each request until the second one enters the LLM. This proves
         # overlap without relying on wall-clock scheduling thresholds.
@@ -581,31 +597,26 @@ class TestConcurrentProcessing:
         both_calls_started = asyncio.Event()
         release_calls = asyncio.Event()
 
-        original_generate = llm_service.generate_response
+        class GatedLLM:
+            async def generate_response(self, transcript, context):
+                nonlocal llm_call_count
+                llm_call_count += 1
+                if llm_call_count == 2:
+                    both_calls_started.set()
+                await release_calls.wait()
+                return SimpleNamespace(text=f"response: {transcript}", parameters={})
 
-        async def tracked_generate(transcript, context):
-            nonlocal llm_call_count
-            llm_call_count += 1
-            if llm_call_count == 2:
-                both_calls_started.set()
-            await release_calls.wait()
-            return await original_generate(transcript, context)
+        pipeline._llm_service = GatedLLM()
 
-        llm_service.generate_response = tracked_generate
-
-        with patch.object(pipeline._stt_service, 'send_audio', new_callable=AsyncMock), \
-             patch.object(type(pipeline._stt_service), 'is_connected',
-                         new_callable=PropertyMock, return_value=True):
-
-            # Feed final transcripts directly; audio/VAD is covered elsewhere.
-            await pipeline._handle_final_transcript("First request", {"confidence": 0.9})
-            await pipeline._handle_final_transcript("Second request", {"confidence": 0.9})
-
+        requests = [
+            asyncio.create_task(pipeline._process_llm("First request")),
+            asyncio.create_task(pipeline._process_llm("Second request")),
+        ]
+        try:
             await asyncio.wait_for(both_calls_started.wait(), timeout=2)
+        finally:
             release_calls.set()
-
-            if pipeline._processing_tasks:
-                await asyncio.gather(*pipeline._processing_tasks, return_exceptions=True)
+        await asyncio.gather(*requests)
 
         assert llm_call_count == 2, f"Expected 2 overlapping LLM calls, got {llm_call_count}"
 

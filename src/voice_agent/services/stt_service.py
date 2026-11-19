@@ -63,7 +63,10 @@ class STTService:
         # Deepgram client and connection
         self._client: AsyncDeepgramClient | None = None
         self._connection: Any | None = None
+        self._connection_context: Any | None = None
         self._listen_task: asyncio.Task | None = None
+        self._connection_cleanup_task: asyncio.Task | None = None
+        self._connection_lock = asyncio.Lock()
 
         # Callback handlers
         self._interim_callback: Callable[[str, dict[str, Any]], None] | None = None
@@ -140,7 +143,7 @@ class STTService:
 
             # Nova models use the Listen V1 endpoint. Listen V2 is the Flux
             # conversational endpoint and does not accept Nova model names.
-            self._connection = await self._client.listen.v1.connect(
+            self._connection_context = self._client.listen.v1.connect(
                 model=self.config.model,
                 language=self.config.language,
                 interim_results=self.config.interim_results,
@@ -150,7 +153,8 @@ class STTService:
                 encoding=self.config.encoding,
                 sample_rate=self.config.sample_rate,
                 channels=self.config.channels,
-            ).__aenter__()
+            )
+            self._connection = await self._connection_context.__aenter__()
 
             # Register event handlers
             self._connection.on(EventType.OPEN, self._on_open)
@@ -177,6 +181,7 @@ class STTService:
         except Exception as e:
             self._state = ConnectionState.ERROR
             logger.error("Failed to connect to Deepgram: %s", str(e))
+            await self._close_connection_context(type(e), e, e.__traceback__)
 
             # Attempt reconnection if within retry limit
             if self._reconnect_attempts < self._max_reconnect_attempts:
@@ -231,7 +236,9 @@ class STTService:
         if (
             self._state == ConnectionState.DISCONNECTED
             and self._connection is None
+            and self._connection_context is None
             and self._listen_task is None
+            and self._connection_cleanup_task is None
         ):
             logger.debug("Already disconnected")
             return
@@ -243,9 +250,21 @@ class STTService:
                 await asyncio.gather(self._listen_task, return_exceptions=True)
                 self._listen_task = None
 
-            if self._connection:
-                await self._connection.__aexit__(None, None, None)
-                self._connection = None
+            await self._close_connection_context()
+            cleanup_task = self._connection_cleanup_task
+            if cleanup_task and cleanup_task is not asyncio.current_task():
+                outcomes = await asyncio.gather(cleanup_task, return_exceptions=True)
+                cleanup_error = next(
+                    (
+                        outcome for outcome in outcomes
+                        if isinstance(outcome, BaseException)
+                        and not isinstance(outcome, asyncio.CancelledError)
+                    ),
+                    None,
+                )
+                if cleanup_error:
+                    raise cleanup_error
+            self._connection_cleanup_task = None
 
             self._client = None
             self._state = ConnectionState.DISCONNECTED
@@ -264,6 +283,9 @@ class STTService:
         if task.cancelled():
             return
         error = task.exception()
+        if task is not self._listen_task:
+            return
+        self._listen_task = None
         if error:
             self._state = ConnectionState.ERROR
             logger.error("Deepgram listener stopped with an error: %s", error)
@@ -271,6 +293,44 @@ class STTService:
                 self._error_callback(error)
         elif self._state == ConnectionState.CONNECTED:
             self._state = ConnectionState.DISCONNECTED
+        # The SDK closes the underlying WebSocket when its async context
+        # manager exits. Clean it up when listening ends unexpectedly too.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        cleanup_task = loop.create_task(
+            self._close_connection_context(
+                type(error) if error else None,
+                error,
+                error.__traceback__ if error else None,
+            )
+        )
+        self._connection_cleanup_task = cleanup_task
+        cleanup_task.add_done_callback(self._on_connection_cleanup_done)
+
+    @staticmethod
+    def _on_connection_cleanup_done(task: asyncio.Task) -> None:
+        """Retrieve background cleanup errors instead of leaking task warnings."""
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error:
+            logger.error("Deepgram connection cleanup failed: %s", error)
+
+    async def _close_connection_context(
+        self,
+        exc_type: type[BaseException] | None = None,
+        exc: BaseException | None = None,
+        traceback: Any = None,
+    ) -> None:
+        """Exit the SDK's async context manager exactly once."""
+        async with self._connection_lock:
+            manager = self._connection_context
+            self._connection_context = None
+            self._connection = None
+            if manager is not None:
+                await manager.__aexit__(exc_type, exc, traceback)
 
     def _on_open(self, *args, **kwargs) -> None:
         """

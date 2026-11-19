@@ -59,6 +59,19 @@ class TestTTSProviderFactory:
     """Test suite for TTS provider factory."""
 
     @pytest.mark.asyncio
+    async def test_placeholder_elevenlabs_voice_fails_before_provider_check(self, factory):
+        voice_config = VoiceConfig(
+            provider="elevenlabs",
+            voice_id="elevenlabs_voice_id_here",
+        )
+        factory.check_provider_health = AsyncMock()
+
+        with pytest.raises(ValueError, match="real ElevenLabs voice ID"):
+            await factory.create_tts_service(voice_config)
+
+        factory.check_provider_health.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_create_elevenlabs_service(self, factory, elevenlabs_voice_config):
         """Test creating ElevenLabs TTS service."""
         # Mock health check to return healthy
@@ -229,9 +242,13 @@ class TestTTSProviderFactory:
     @pytest.mark.asyncio
     async def test_check_elevenlabs_health_unavailable(self, factory):
         """Test ElevenLabs health check when service is unavailable."""
-        mock_session = AsyncMock()
-        mock_session.get.side_effect = aiohttp.ClientError("Connection failed")
-        mock_session.__aenter__.return_value = mock_session
+        mock_request = MagicMock()
+        mock_request.__aenter__ = AsyncMock(
+            side_effect=aiohttp.ClientError("Connection failed")
+        )
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_request
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
 
         with patch('aiohttp.ClientSession', return_value=mock_session):
             health = await factory.check_provider_health("elevenlabs")

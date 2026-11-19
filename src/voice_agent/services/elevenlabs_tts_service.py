@@ -65,6 +65,24 @@ class VoiceConfig:
             raise ValueError(f"Style must be between 0.0 and 1.0, got {self.style}")
 
 
+def validate_voice_config(config: VoiceConfig) -> None:
+    """Reject unset/template ElevenLabs voice IDs before any provider request."""
+    if config.provider.lower() != "elevenlabs":
+        return
+
+    voice_id = config.voice_id.strip()
+    placeholders = {
+        "elevenlabs_voice_id_here",
+        "your_elevenlabs_voice_id",
+        "your_voice_id_here",
+        "placeholder",
+    }
+    if not voice_id or voice_id.casefold() in placeholders or (
+        voice_id.startswith("<") and voice_id.endswith(">")
+    ):
+        raise ValueError("A real ElevenLabs voice ID must be configured before starting TTS")
+
+
 @dataclass
 class VoiceSettings:
     """
