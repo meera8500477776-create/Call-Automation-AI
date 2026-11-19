@@ -14,6 +14,7 @@ from typing import Any
 
 import aiohttp
 
+from ..config.settings import Settings
 from .elevenlabs_tts_service import (
     ElevenLabsTTSService,
     TTSConfig,
@@ -55,8 +56,13 @@ class TTSProviderFactory:
             openai_api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
             enable_failover: Enable automatic failover from ElevenLabs to OpenAI
         """
-        self.elevenlabs_api_key = elevenlabs_api_key
-        self.openai_api_key = openai_api_key
+        configured = Settings() if elevenlabs_api_key is None or openai_api_key is None else None
+        self.elevenlabs_api_key = (
+            elevenlabs_api_key if elevenlabs_api_key is not None else configured.elevenlabs_api_key
+        )
+        self.openai_api_key = (
+            openai_api_key if openai_api_key is not None else configured.openai_api_key
+        )
         self.enable_failover = enable_failover
 
         # Cache for provider health status

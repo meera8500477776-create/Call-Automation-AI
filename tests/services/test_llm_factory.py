@@ -71,6 +71,11 @@ def vllm_config():
 class TestLLMProviderFactory:
     """Test suite for LLM provider factory."""
 
+    def test_default_openai_key_is_loaded_from_application_settings(self):
+        factory = LLMProviderFactory()
+
+        assert factory.openai_api_key == "test-openai-key"
+
     @pytest.mark.asyncio
     async def test_create_openai_service(self, factory, openai_config):
         """Test creating OpenAI service instance."""
@@ -440,7 +445,7 @@ class TestEdgeCases:
         """Test factory initialization with default values."""
         factory = LLMProviderFactory()
 
-        assert factory.openai_api_key is None
+        assert factory.openai_api_key == "test-openai-key"
         assert factory.ollama_base_url == "http://localhost:11434"
         assert factory.vllm_base_url == "http://localhost:8000"
         assert factory.enable_failover is True

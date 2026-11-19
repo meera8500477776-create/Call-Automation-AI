@@ -72,6 +72,10 @@ class OpenAITTSService:
             config.model,
         )
 
+    async def aclose(self) -> None:
+        """Close the OpenAI SDK's async HTTP client."""
+        await self.client.close()
+
     async def synthesize_streaming(
         self,
         text: str,

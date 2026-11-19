@@ -63,6 +63,12 @@ def tts_service(tts_config, mock_openai_client):
 class TestOpenAITTSService:
     """Test OpenAI TTS service."""
 
+    @pytest.mark.asyncio
+    async def test_aclose_closes_sdk_client(self, tts_service, mock_openai_client):
+        await tts_service.aclose()
+
+        mock_openai_client.close.assert_awaited_once()
+
     def test_initialization(self, tts_service, tts_config):
         """Test service initialization."""
         assert tts_service.config == tts_config

@@ -140,12 +140,29 @@ class ElevenLabsTTSService:
 
         # Cache for voice settings
         self._voice_settings_cache: dict[str, VoiceSettings] = {}
+        self._closed = False
 
         logger.info(
             "ElevenLabs TTS service initialized (voice: %s, model: %s)",
             config.default_voice_config.voice_id,
             config.default_voice_config.model_id,
         )
+
+    async def aclose(self) -> None:
+        """Close the HTTP transport owned by the installed ElevenLabs SDK."""
+        if self._closed:
+            return
+
+        close = getattr(self.client, "aclose", None) or getattr(self.client, "close", None)
+        if close is None:
+            # elevenlabs 2.79.0 does not expose a public close method; its
+            # async client wrapper owns the documented httpx transport here.
+            wrapper = getattr(self.client, "_client_wrapper", None)
+            transport = getattr(getattr(wrapper, "httpx_client", None), "httpx_client", None)
+            close = getattr(transport, "aclose", None)
+        if close is not None:
+            await close()
+        self._closed = True
 
     async def synthesize_streaming(
         self,

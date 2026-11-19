@@ -349,6 +349,8 @@ class TestPipecatOrchestrator:
         assert stt_config.language == "en-US"
         assert stt_config.interim_results is True
         assert stt_config.punctuate is True
+        assert stt_config.endpointing_ms == 300
+        assert stt_config.utterance_end_ms == 1000
 
     def test_build_vad_config(self, orchestrator, mock_tenant_config):
         """Test VAD configuration building."""

@@ -11,7 +11,9 @@ import uuid
 
 from dotenv import load_dotenv
 
-load_dotenv()
+from .config.settings import ENV_FILE  # noqa: E402
+
+load_dotenv(ENV_FILE, override=False)
 
 from .config.registry import TenantRegistry  # noqa: E402
 from .config.settings import Settings  # noqa: E402

@@ -7,6 +7,7 @@ and error handling for the ElevenLabs TTS service wrapper.
 **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6**
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -114,6 +115,19 @@ class TestVoiceConfig:
 
 class TestElevenLabsTTSService:
     """Test ElevenLabs TTS service."""
+
+    @pytest.mark.asyncio
+    async def test_aclose_closes_installed_sdk_transport(self, tts_service):
+        transport_close = AsyncMock()
+        tts_service.client = SimpleNamespace(
+            _client_wrapper=SimpleNamespace(
+                httpx_client=SimpleNamespace(httpx_client=SimpleNamespace(aclose=transport_close))
+            )
+        )
+
+        await tts_service.aclose()
+
+        transport_close.assert_awaited_once()
 
     def test_initialization(self, tts_service, tts_config):
         """Test service initialization."""

@@ -9,12 +9,12 @@ and handles call routing and session lifecycle management.
 """
 
 import logging
-import os
 from dataclasses import dataclass
 from typing import Any
 
 from ..config.registry import TenantRegistry
 from ..config.schema import TenantConfig
+from ..config.settings import Settings
 from ..services.elevenlabs_tts_service import VoiceConfig, validate_voice_config
 from ..services.llm_factory import LLMProviderFactory
 from ..services.stt_service import STTConfig
@@ -46,11 +46,13 @@ class PipecatOrchestrator:
         self,
         tenant_registry: TenantRegistry,
         session_manager: SessionManager | None = None,
+        settings: Settings | None = None,
     ):
         """Initialize the Pipecat Orchestrator."""
         self._tenant_registry = tenant_registry
         self._session_manager = session_manager or SessionManager()
-        self._llm_factory = LLMProviderFactory()
+        self._settings = settings or Settings()
+        self._llm_factory = LLMProviderFactory(openai_api_key=self._settings.openai_api_key)
         self._active_pipelines: dict[str, VoicePipeline] = {}
         logger.info("Pipecat Orchestrator initialized")
 
@@ -110,13 +112,17 @@ class PipecatOrchestrator:
     def _build_stt_config(self, tenant_config: TenantConfig) -> STTConfig:
         """Build STT configuration from tenant config."""
         stt = getattr(tenant_config, 'stt', None)
+        endpointing_ms = getattr(stt, "endpointing_ms", None) if stt else None
+        utterance_end_ms = getattr(stt, "utterance_end_ms", None) if stt else None
         return STTConfig(
             api_key=(getattr(stt, 'api_key', None) if stt else None)
-            or os.getenv("DEEPGRAM_API_KEY", ""),
+            or self._settings.deepgram_api_key,
             model=getattr(stt, 'model', "nova-2") if stt else "nova-2",
             language=getattr(stt, 'language', "en-US") if stt else "en-US",
             interim_results=getattr(stt, 'interim_results', True) if stt else True,
             punctuate=getattr(stt, 'punctuate', True) if stt else True,
+            endpointing_ms=endpointing_ms if isinstance(endpointing_ms, int) else 300,
+            utterance_end_ms=utterance_end_ms if isinstance(utterance_end_ms, int) else 1000,
         )
 
     def _build_vad_config(self, tenant_config: TenantConfig) -> VADConfig:

@@ -6,16 +6,78 @@ It handles WebSocket connections, audio streaming, and transcript callbacks.
 """
 
 import asyncio
+import inspect
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+import websockets
 from deepgram import AsyncDeepgramClient
 from deepgram.core.events import EventType
 
 logger = logging.getLogger(__name__)
+_WEBSOCKETS_HEADERS_ARGUMENT = (
+    "additional_headers" if "additional_headers" in inspect.signature(websockets.connect).parameters else "extra_headers"
+)
+
+
+class _NoPingWebSocketTransport:
+    """Deepgram transport that disables conflicting websocket protocol pings."""
+
+    def __init__(self, url: str, headers: dict[str, str]):
+        self._url = url
+        self._headers = headers
+        self._connect_context: Any | None = None
+        self._websocket: Any | None = None
+        self._connect_lock = asyncio.Lock()
+
+    async def ensure_connected(self) -> None:
+        """Establish the socket lazily with automatic pings disabled."""
+        async with self._connect_lock:
+            if self._websocket is not None:
+                return
+
+            context = websockets.connect(
+                self._url,
+                **{_WEBSOCKETS_HEADERS_ARGUMENT: self._headers},
+                ping_interval=None,
+            )
+            try:
+                websocket = await context.__aenter__()
+            except Exception:
+                # The websockets context manager unwinds a failed handshake itself.
+                raise
+            self._connect_context = context
+            self._websocket = websocket
+
+    async def send(self, data: Any) -> None:
+        await self.ensure_connected()
+        await self._websocket.send(data)
+
+    async def recv(self) -> Any:
+        await self.ensure_connected()
+        return await self._websocket.recv()
+
+    def __aiter__(self):
+        return self._iter_messages()
+
+    async def _iter_messages(self):
+        await self.ensure_connected()
+        async for message in self._websocket:
+            yield message
+
+    async def close(self) -> None:
+        context = self._connect_context
+        self._connect_context = None
+        self._websocket = None
+        if context is not None:
+            await context.__aexit__(None, None, None)
+
+
+def _create_no_ping_transport(url: str, headers: dict[str, str]) -> _NoPingWebSocketTransport:
+    return _NoPingWebSocketTransport(url, headers)
 
 
 class ConnectionState(Enum):
@@ -39,6 +101,8 @@ class STTConfig:
     encoding: str = "linear16"
     sample_rate: int = 16000
     channels: int = 1
+    endpointing_ms: int = 300
+    utterance_end_ms: int = 1000
 
 
 class STTService:
@@ -67,6 +131,10 @@ class STTService:
         self._listen_task: asyncio.Task | None = None
         self._connection_cleanup_task: asyncio.Task | None = None
         self._connection_lock = asyncio.Lock()
+        self._callback_tasks: set[asyncio.Task[Any]] = set()
+        self._final_transcript_parts: list[str] = []
+        self._last_interim_transcript: str = ""
+        self._last_transcript_metadata: dict[str, Any] = {}
 
         # Callback handlers
         self._interim_callback: Callable[[str, dict[str, Any]], None] | None = None
@@ -135,11 +203,15 @@ class STTService:
             await self.disconnect()
 
         self._session_id = session_id
+        self._reset_transcript_buffer()
         self._state = ConnectionState.CONNECTING
 
         try:
             # Initialize Deepgram client
-            self._client = AsyncDeepgramClient(api_key=self.config.api_key)
+            self._client = AsyncDeepgramClient(
+                api_key=self.config.api_key,
+                transport_factory=_create_no_ping_transport,
+            )
 
             # Nova models use the Listen V1 endpoint. Listen V2 is the Flux
             # conversational endpoint and does not accept Nova model names.
@@ -153,8 +225,13 @@ class STTService:
                 encoding=self.config.encoding,
                 sample_rate=self.config.sample_rate,
                 channels=self.config.channels,
+                endpointing=self.config.endpointing_ms,
+                utterance_end_ms=self.config.utterance_end_ms,
             )
             self._connection = await self._connection_context.__aenter__()
+            socket_transport = getattr(self._connection, "_websocket", None)
+            if isinstance(socket_transport, _NoPingWebSocketTransport):
+                await socket_transport.ensure_connected()
 
             # Register event handlers
             self._connection.on(EventType.OPEN, self._on_open)
@@ -198,7 +275,7 @@ class STTService:
                 error_msg = f"Failed to connect after {self._max_reconnect_attempts} attempts"
                 logger.error(error_msg)
                 if self._error_callback:
-                    self._error_callback(ConnectionError(error_msg))
+                    self._invoke_callback(self._error_callback, ConnectionError(error_msg))
                 raise ConnectionError(error_msg) from e
 
     async def send_audio(self, audio_chunk: bytes) -> None:
@@ -226,7 +303,7 @@ class STTService:
             logger.error("Failed to send audio chunk: %s", str(e))
             self._state = ConnectionState.ERROR
             if self._error_callback:
-                self._error_callback(e)
+                self._invoke_callback(self._error_callback, e)
             raise
 
     async def disconnect(self) -> None:
@@ -239,6 +316,7 @@ class STTService:
             and self._connection_context is None
             and self._listen_task is None
             and self._connection_cleanup_task is None
+            and not self._callback_tasks
         ):
             logger.debug("Already disconnected")
             return
@@ -249,6 +327,14 @@ class STTService:
                     self._listen_task.cancel()
                 await asyncio.gather(self._listen_task, return_exceptions=True)
                 self._listen_task = None
+
+            callback_tasks = tuple(self._callback_tasks)
+            for task in callback_tasks:
+                if not task.done():
+                    task.cancel()
+            if callback_tasks:
+                await asyncio.gather(*callback_tasks, return_exceptions=True)
+            self._callback_tasks.clear()
 
             await self._close_connection_context()
             cleanup_task = self._connection_cleanup_task
@@ -277,6 +363,49 @@ class STTService:
             raise
         finally:
             self._session_id = None
+            self._reset_transcript_buffer()
+
+    def _invoke_callback(self, callback: Callable[..., Any], *args: Any) -> None:
+        """Call sync callbacks immediately and schedule async callbacks safely."""
+        result = callback(*args)
+        if not inspect.isawaitable(result):
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            if inspect.iscoroutine(result):
+                result.close()
+            logger.error("Async Deepgram callback invoked without a running event loop")
+            return
+
+        task = loop.create_task(result)
+        self._callback_tasks.add(task)
+        task.add_done_callback(self._on_callback_done)
+
+    def _on_callback_done(self, task: asyncio.Task[Any]) -> None:
+        """Retrieve callback task failures so none are silently lost."""
+        self._callback_tasks.discard(task)
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error:
+            logger.error("Deepgram callback failed: %s", error)
+
+    def _reset_transcript_buffer(self) -> None:
+        self._final_transcript_parts.clear()
+        self._last_interim_transcript = ""
+        self._last_transcript_metadata = {}
+
+    def _flush_transcript(self, fallback: str = "") -> None:
+        """Dispatch one complete utterance from finalized segments."""
+        transcript = " ".join(part for part in self._final_transcript_parts if part).strip()
+        if not transcript:
+            transcript = fallback.strip()
+        if transcript and self._final_callback:
+            metadata = dict(self._last_transcript_metadata)
+            metadata.update(is_final=True, speech_final=True)
+            self._invoke_callback(self._final_callback, transcript, metadata)
+        self._reset_transcript_buffer()
 
     def _on_listener_done(self, task: asyncio.Task) -> None:
         """Retrieve listener task errors and update connection state."""
@@ -352,9 +481,12 @@ class STTService:
 
             message = args[0]
 
-            # Check if this is a transcript message
-            if not hasattr(message, 'type') or message.type != 'Results':
-                logger.debug("Received non-transcript message: %s", getattr(message, 'type', 'unknown'))
+            message_type = getattr(message, "type", "unknown")
+            if message_type == "UtteranceEnd":
+                self._flush_transcript(self._last_interim_transcript)
+                return
+            if message_type != "Results":
+                logger.debug("Received non-transcript message: %s", message_type)
                 return
 
             # Extract transcript data
@@ -383,21 +515,29 @@ class STTService:
                 "duration": getattr(message, 'duration', 0.0),
                 "start": getattr(message, 'start', 0.0),
             }
+            self._last_transcript_metadata = metadata
 
-            # Invoke appropriate callback
             if metadata["is_final"]:
-                logger.info("Final transcript: %s (confidence: %.2f)", transcript, metadata["confidence"])
-                if self._final_callback:
-                    self._final_callback(transcript, metadata)
+                self._final_transcript_parts.append(transcript.strip())
             else:
+                self._last_interim_transcript = transcript.strip()
                 logger.debug("Interim transcript: %s", transcript)
                 if self._interim_callback:
-                    self._interim_callback(transcript, metadata)
+                    self._invoke_callback(self._interim_callback, transcript, metadata)
+
+            # Finalized segments can arrive before Deepgram detects an utterance
+            # boundary. Concatenate those segments and invoke the LLM once at the
+            # boundary; some Results frames signal the boundary with speech_final
+            # while is_final is false, so retain their transcript as a fallback.
+            if metadata["speech_final"]:
+                fallback = transcript if not metadata["is_final"] else ""
+                logger.info("Final transcript received (confidence: %.2f)", metadata["confidence"])
+                self._flush_transcript(fallback)
 
         except Exception as e:
             logger.error("Error processing message: %s", str(e))
             if self._error_callback:
-                self._error_callback(e)
+                self._invoke_callback(self._error_callback, e)
 
     def _on_error(self, *args, **kwargs) -> None:
         """
@@ -410,7 +550,7 @@ class STTService:
             self._state = ConnectionState.ERROR
 
             if self._error_callback:
-                self._error_callback(Exception(str(error)))
+                self._invoke_callback(self._error_callback, Exception(str(error)))
 
         except Exception as e:
             logger.error("Error in error handler: %s", str(e))

@@ -559,6 +559,20 @@ class TestVoicePipelineShutdown:
             mock_disconnect.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_shutdown_closes_provider_clients(self, pipeline):
+        tts_close = AsyncMock()
+        llm_close = AsyncMock()
+        pipeline._tts_service = SimpleNamespace(aclose=tts_close)
+        pipeline._llm_service.aclose = llm_close
+        pipeline._state = PipelineState.ACTIVE
+
+        with patch.object(pipeline._stt_service, "disconnect", new_callable=AsyncMock):
+            await pipeline.shutdown()
+
+        tts_close.assert_awaited_once()
+        llm_close.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_shutdown_cancels_tts(self, pipeline):
         """Test shutdown cancels ongoing TTS."""
         # Create a real asyncio task that we can cancel

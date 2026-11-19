@@ -1,6 +1,12 @@
 """Tests for application settings."""
 
-from voice_agent.config.settings import Settings
+from voice_agent.config.settings import ENV_FILE, Settings
+
+
+def test_env_file_is_anchored_to_repository() -> None:
+    """The app must load its repository .env even when started outside the repo cwd."""
+    assert Settings.model_config["env_file"] == ENV_FILE
+    assert ENV_FILE.name == ".env"
 
 
 def test_settings_from_env() -> None:

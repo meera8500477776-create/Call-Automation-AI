@@ -55,6 +55,10 @@ class OpenAILLMService(LLMService):
 
         logger.info("OpenAI LLM service initialized with model: %s", config.model)
 
+    async def aclose(self) -> None:
+        """Close the OpenAI SDK's async HTTP client."""
+        await self.client.close()
+
     async def generate_response(
         self,
         transcript: str,

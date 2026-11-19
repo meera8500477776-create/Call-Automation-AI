@@ -13,7 +13,9 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.responses import Response
 from twilio.request_validator import RequestValidator
 
-load_dotenv()
+from ..config.settings import ENV_FILE  # noqa: E402
+
+load_dotenv(ENV_FILE, override=False)
 
 from ..config.registry import TenantRegistry  # noqa: E402
 from ..config.settings import Settings  # noqa: E402

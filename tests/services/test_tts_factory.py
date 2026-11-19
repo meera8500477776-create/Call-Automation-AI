@@ -58,6 +58,12 @@ def openai_voice_config():
 class TestTTSProviderFactory:
     """Test suite for TTS provider factory."""
 
+    def test_default_provider_keys_are_loaded_from_application_settings(self):
+        factory = TTSProviderFactory()
+
+        assert factory.elevenlabs_api_key == "test-elevenlabs-key"
+        assert factory.openai_api_key == "test-openai-key"
+
     @pytest.mark.asyncio
     async def test_placeholder_elevenlabs_voice_fails_before_provider_check(self, factory):
         voice_config = VoiceConfig(

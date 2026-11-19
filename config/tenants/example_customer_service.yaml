@@ -16,7 +16,7 @@ persona:
 
 llm:
   provider: "openai"  # openai, ollama, vllm
-  model: "gpt-4"
+  model: "gpt-4.1-mini"
   temperature: 0.7
   max_tokens: 150
 

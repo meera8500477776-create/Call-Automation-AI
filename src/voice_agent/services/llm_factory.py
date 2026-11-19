@@ -14,6 +14,7 @@ from typing import Any
 
 import aiohttp
 
+from ..config.settings import Settings
 from .llm_service import LLMConfig, LLMService
 from .ollama_llm_service import OllamaLLMService
 from .openai_llm_service import OpenAILLMService
@@ -54,7 +55,9 @@ class LLMProviderFactory:
             vllm_base_url: vLLM server base URL
             enable_failover: Enable automatic failover to alternative providers
         """
-        self.openai_api_key = openai_api_key
+        self.openai_api_key = (
+            openai_api_key if openai_api_key is not None else Settings().openai_api_key
+        )
         self.ollama_base_url = ollama_base_url
         self.vllm_base_url = vllm_base_url
         self.enable_failover = enable_failover

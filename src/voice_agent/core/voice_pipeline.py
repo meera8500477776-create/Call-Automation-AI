@@ -10,6 +10,7 @@ Supports concurrent processing, barge-in, and streaming optimizations.
 
 import asyncio
 import copy
+import inspect
 import logging
 import time
 from collections.abc import Callable
@@ -289,6 +290,15 @@ class VoicePipeline:
             # state to DISCONNECTED; the adapter may still own a listener task
             # or an entered WebSocket context that needs cleanup.
             await self._stt_service.disconnect()
+
+            # Provider SDKs own HTTP transports that must be closed at the end
+            # of a local or telephony session.
+            for service in (self._tts_service, self._llm_service):
+                close = getattr(service, "aclose", None)
+                if callable(close):
+                    result = close()
+                    if inspect.isawaitable(result):
+                        await result
 
             # Reset VAD
             self._vad_module.reset()

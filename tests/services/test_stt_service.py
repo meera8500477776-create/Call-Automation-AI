@@ -14,6 +14,7 @@ from src.voice_agent.services.stt_service import (
     ConnectionState,
     STTConfig,
     STTService,
+    _NoPingWebSocketTransport,
 )
 
 
@@ -143,9 +144,35 @@ class TestConnectionManagement:
             assert stt_service._session_id == "test_session_123"
 
             # Verify connection was started
+            mock_client_class.assert_called_once()
+            assert mock_client_class.call_args.kwargs["api_key"] == "test_api_key"
+            assert callable(mock_client_class.call_args.kwargs["transport_factory"])
+            assert mock_connect.call_args.kwargs["encoding"] == "linear16"
+            assert mock_connect.call_args.kwargs["sample_rate"] == 16000
+            assert mock_connect.call_args.kwargs["endpointing"] == 300
+            assert mock_connect.call_args.kwargs["utterance_end_ms"] == 1000
             mock_connection.start_listening.assert_awaited_once()
             assert not stt_service._listen_task.done()
             await stt_service.disconnect()
+
+    @pytest.mark.asyncio
+    async def test_custom_transport_disables_protocol_pings_and_closes(self):
+        websocket = AsyncMock()
+        connect_context = AsyncMock()
+        connect_context.__aenter__.return_value = websocket
+
+        with patch("src.voice_agent.services.stt_service.websockets.connect", return_value=connect_context) as connect:
+            transport = _NoPingWebSocketTransport("wss://deepgram.example/listen", {"Authorization": "test"})
+            await transport.send(b"pcm")
+
+            connect.assert_called_once_with(
+                "wss://deepgram.example/listen",
+                additional_headers={"Authorization": "test"},
+                ping_interval=None,
+            )
+            websocket.send.assert_awaited_once_with(b"pcm")
+            await transport.close()
+            connect_context.__aexit__.assert_awaited_once_with(None, None, None)
 
     @pytest.mark.asyncio
     async def test_connect_failure_with_retry(self, stt_service):
@@ -463,6 +490,75 @@ class TestMessageHandling:
         assert transcript == "Complete sentence."
         assert metadata["confidence"] == 0.95
         assert metadata["is_final"] is True
+
+    def test_final_segments_are_combined_until_utterance_boundary(self, stt_service):
+        final_callback = Mock()
+        stt_service.on_final_result(final_callback)
+
+        def result(text, is_final, speech_final):
+            alternative = Mock(transcript=text, confidence=0.9)
+            channel = Mock(alternatives=[alternative])
+            return Mock(
+                type="Results",
+                channel=channel,
+                is_final=is_final,
+                speech_final=speech_final,
+                duration=1.0,
+                start=0.0,
+            )
+
+        stt_service._on_message(result("Good morning", True, False))
+        final_callback.assert_not_called()
+
+        stt_service._on_message(result("how can I help", True, True))
+
+        final_callback.assert_called_once()
+        transcript, metadata = final_callback.call_args.args
+        assert transcript == "Good morning how can I help"
+        assert metadata["is_final"] is True
+        assert metadata["speech_final"] is True
+
+    def test_speech_final_interim_is_used_when_no_final_segment_arrived(self, stt_service):
+        final_callback = Mock()
+        stt_service.on_final_result(final_callback)
+        message = Mock(
+            type="Results",
+            channel=Mock(alternatives=[Mock(transcript="I need help", confidence=0.92)]),
+            is_final=False,
+            speech_final=True,
+            duration=1.0,
+            start=0.0,
+        )
+
+        stt_service._on_message(message)
+
+        final_callback.assert_called_once()
+        transcript, metadata = final_callback.call_args.args
+        assert transcript == "I need help"
+        assert metadata["speech_final"] is True
+
+    @pytest.mark.asyncio
+    async def test_async_transcript_callback_is_scheduled_and_observed(self, stt_service):
+        received = []
+
+        async def callback(text, metadata):
+            received.append((text, metadata["is_final"]))
+
+        stt_service.on_interim_result(callback)
+        message = Mock(
+            type="Results",
+            channel=Mock(alternatives=[Mock(transcript="Hello", confidence=0.9)]),
+            is_final=False,
+            speech_final=False,
+            duration=0.5,
+            start=0.0,
+        )
+
+        stt_service._on_message(message)
+        await asyncio.gather(*tuple(stt_service._callback_tasks))
+
+        assert received == [("Hello", False)]
+        assert not stt_service._callback_tasks
 
     def test_empty_message_ignored(self, stt_service):
         """Test empty messages are ignored."""
