@@ -35,7 +35,9 @@ class GeminiLLMService(LLMService):
             http_options=types.HttpOptions(timeout=int(config.timeout * 1000)),
         )
         self._api_key = api_key
-        self.max_retries = max(1, max_retries)
+        # Keep provider retries bounded even if a caller supplies an overly
+        # large value. Two attempts is the default for transient 503/504s.
+        self.max_retries = min(3, max(1, int(max_retries)))
         self._model_validated = False
 
     async def aclose(self) -> None:
@@ -233,11 +235,10 @@ class GeminiLLMService(LLMService):
                 if (
                     attempt + 1 >= self.max_retries
                     or not self._is_retryable(exc)
-                    or request_state["stream_opened"]
                     or request_state["text_emitted"]
                 ):
                     break
-                await asyncio.sleep(0.25 * (attempt + 1))
+                await asyncio.sleep(0.5 * (2**attempt))
         summary = self._error_summary(last_error) if last_error else "unknown error"
         logger.error("Gemini generation failed: %s", summary)
         raise RuntimeError(

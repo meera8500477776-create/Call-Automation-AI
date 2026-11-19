@@ -38,6 +38,27 @@ class AsyncResponses:
             yield chunk
 
 
+class FailingAsyncResponses:
+    def __init__(self, error):
+        self.error = error
+
+    def __aiter__(self):
+        return self._iterate()
+
+    async def _iterate(self):
+        raise self.error
+        yield  # pragma: no cover - makes this an async generator
+
+
+class FailingAfterTextResponses:
+    def __aiter__(self):
+        return self._iterate()
+
+    async def _iterate(self):
+        yield SimpleNamespace(text="Partial answer", usage_metadata=None)
+        raise RuntimeError("503 UNAVAILABLE: high demand")
+
+
 @pytest.fixture
 def setup_gemini():
     models = AsyncModels()
@@ -99,6 +120,43 @@ async def test_second_turn_continues_gemini_interaction(setup_gemini, conversati
     assert [item.role for item in second_contents] == ["user", "model", "user", "user"]
     assert second_contents[1].parts[0].text == "I can help. What is your order number?"
     assert second_contents[-1].parts[0].text == "Please remember I like short answers."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [503, 504])
+async def test_retries_transient_failure_before_first_stream_text(setup_gemini, conversation, status):
+    service, models, _ = setup_gemini
+    models.generate_content_stream.side_effect = [
+        FailingAsyncResponses(RuntimeError(f"{status} UNAVAILABLE: transient failure")),
+        AsyncResponses([SimpleNamespace(text="A real response.", usage_metadata=None)]),
+    ]
+
+    response = await service.generate_response("Help me.", conversation)
+
+    assert response.text == "A real response."
+    assert models.generate_content_stream.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_does_not_retry_after_stream_has_emitted_text(setup_gemini, conversation):
+    service, models, _ = setup_gemini
+    models.generate_content_stream.return_value = FailingAfterTextResponses()
+
+    with pytest.raises(RuntimeError, match="response generation failed"):
+        await service.generate_response("Help me.", conversation)
+
+    assert models.generate_content_stream.await_count == 1
+
+
+def test_retry_count_is_bounded():
+    client = SimpleNamespace(aio=SimpleNamespace(aclose=AsyncMock()))
+    with patch("voice_agent.services.gemini_llm_service.genai.Client", return_value=client):
+        service = GeminiLLMService(
+            LLMConfig(provider="gemini", model="gemini-3.8-flash"),
+            api_key="test-gemini-key",
+            max_retries=100,
+        )
+    assert service.max_retries == 3
 
 
 @pytest.mark.asyncio
