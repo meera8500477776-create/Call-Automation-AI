@@ -15,6 +15,7 @@ from typing import Any
 import aiohttp
 
 from ..config.settings import Settings
+from .gemini_llm_service import GeminiLLMService
 from .llm_service import LLMConfig, LLMService
 from .ollama_llm_service import OllamaLLMService
 from .openai_llm_service import OpenAILLMService
@@ -42,6 +43,7 @@ class LLMProviderFactory:
     def __init__(
         self,
         openai_api_key: str | None = None,
+        gemini_api_key: str | None = None,
         ollama_base_url: str = "http://localhost:11434",
         vllm_base_url: str = "http://localhost:8000",
         enable_failover: bool = True,
@@ -51,13 +53,14 @@ class LLMProviderFactory:
 
         Args:
             openai_api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
+            gemini_api_key: Gemini API key (if None, uses GEMINI_API_KEY env var)
             ollama_base_url: Ollama server base URL
             vllm_base_url: vLLM server base URL
             enable_failover: Enable automatic failover to alternative providers
         """
-        self.openai_api_key = (
-            openai_api_key if openai_api_key is not None else Settings().openai_api_key
-        )
+        configured = Settings() if openai_api_key is None or gemini_api_key is None else None
+        self.openai_api_key = openai_api_key if openai_api_key is not None else configured.openai_api_key
+        self.gemini_api_key = gemini_api_key if gemini_api_key is not None else configured.gemini_api_key
         self.ollama_base_url = ollama_base_url
         self.vllm_base_url = vllm_base_url
         self.enable_failover = enable_failover
@@ -127,7 +130,7 @@ class LLMProviderFactory:
         except Exception as e:
             logger.error("Failed to create provider '%s': %s", config.provider, str(e))
 
-            if self.enable_failover:
+            if self.enable_failover and config.provider.lower() in {"ollama", "vllm"}:
                 logger.info("Attempting failover after provider creation failure")
                 return await self._create_with_failover(config, provider_config)
             else:
@@ -154,6 +157,13 @@ class LLMProviderFactory:
             ValueError: If provider is not supported
         """
         provider = config.provider.lower()
+
+        if provider == "gemini":
+            return GeminiLLMService(
+                config=config,
+                api_key=provider_config.get("api_key", self.gemini_api_key),
+                max_retries=provider_config.get("max_retries", 2),
+            )
 
         if provider == "openai":
             return OpenAILLMService(
@@ -297,7 +307,7 @@ class LLMProviderFactory:
         health checks.
 
         Args:
-            provider: Provider name ("openai", "ollama", "vllm")
+            provider: Provider name ("gemini", "openai", "ollama", "vllm")
 
         Returns:
             Provider health status
@@ -312,6 +322,11 @@ class LLMProviderFactory:
             if provider == "openai":
                 # OpenAI is always considered healthy (cloud service)
                 # Could add actual API check if needed
+                health = ProviderHealth.HEALTHY
+
+            elif provider == "gemini":
+                # Keep factory health checks side-effect free; the first model request
+                # validates this provider's credentials and model access.
                 health = ProviderHealth.HEALTHY
 
             elif provider == "ollama":
@@ -390,7 +405,7 @@ class LLMProviderFactory:
         Returns:
             Dictionary mapping provider names to health status
         """
-        providers = ["openai", "ollama", "vllm"]
+        providers = ["gemini", "openai", "ollama", "vllm"]
         health_status = {}
 
         for provider in providers:

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # API Keys
     openai_api_key: str = Field(default="", description="OpenAI API key")
+    gemini_api_key: str = Field(default="", description="Google Gemini API key")
     deepgram_api_key: str = Field(default="", description="Deepgram API key")
     elevenlabs_api_key: str = Field(default="", description="ElevenLabs API key")
     twilio_account_sid: str = Field(default="", description="Twilio account SID")
@@ -35,8 +36,8 @@ class Settings(BaseSettings):
     server_port: int = Field(default=8000, ge=1, le=65535, description="HTTP server port")
 
     # LLM Configuration
-    llm_provider: Literal["openai", "ollama", "vllm"] = Field(
-        default="openai", description="LLM provider"
+    llm_provider: Literal["gemini", "openai", "ollama", "vllm"] = Field(
+        default="gemini", description="LLM provider"
     )
     ollama_base_url: str = Field(
         default="http://localhost:11434", description="Ollama base URL"
@@ -44,8 +45,8 @@ class Settings(BaseSettings):
     vllm_base_url: str = Field(default="http://localhost:8000", description="vLLM base URL")
 
     # TTS Configuration
-    tts_provider: Literal["elevenlabs", "openai"] = Field(
-        default="elevenlabs", description="TTS provider"
+    tts_provider: Literal["gemini", "elevenlabs", "openai"] = Field(
+        default="gemini", description="TTS provider"
     )
 
     # Encryption

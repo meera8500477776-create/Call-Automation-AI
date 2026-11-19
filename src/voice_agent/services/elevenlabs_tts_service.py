@@ -37,7 +37,7 @@ class VoiceConfig:
     Configuration for TTS voice synthesis.
 
     Attributes:
-        provider: TTS provider ("elevenlabs" or "openai")
+        provider: TTS provider ("gemini", "elevenlabs", or "openai")
         voice_id: Provider-specific voice identifier
         stability: Voice stability (0.0-1.0, ElevenLabs only)
         similarity_boost: Similarity boost (0.0-1.0, ElevenLabs only)
@@ -55,7 +55,7 @@ class VoiceConfig:
 
     def __post_init__(self):
         """Validate configuration."""
-        if self.provider not in ["elevenlabs", "openai"]:
+        if self.provider not in ["gemini", "elevenlabs", "openai"]:
             raise ValueError(f"Invalid provider: {self.provider}")
         if not 0.0 <= self.stability <= 1.0:
             raise ValueError(f"Stability must be between 0.0 and 1.0, got {self.stability}")
@@ -63,6 +63,8 @@ class VoiceConfig:
             raise ValueError(f"Similarity boost must be between 0.0 and 1.0, got {self.similarity_boost}")
         if not 0.0 <= self.style <= 1.0:
             raise ValueError(f"Style must be between 0.0 and 1.0, got {self.style}")
+        if self.provider == "gemini" and not self.voice_id.strip():
+            raise ValueError("A Gemini prebuilt voice name must be configured")
 
 
 def validate_voice_config(config: VoiceConfig) -> None:

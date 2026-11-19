@@ -16,6 +16,7 @@ from src.voice_agent.services.elevenlabs_tts_service import (
     ElevenLabsTTSService,
     VoiceConfig,
 )
+from src.voice_agent.services.gemini_tts_service import GeminiTTSService
 from src.voice_agent.services.openai_tts_service import OpenAITTSService
 from src.voice_agent.services.tts_factory import (
     ProviderHealth,
@@ -29,6 +30,7 @@ def factory():
     return TTSProviderFactory(
         elevenlabs_api_key="test_elevenlabs_key",
         openai_api_key="test_openai_key",
+        gemini_api_key="test_gemini_key",
         enable_failover=True,
     )
 
@@ -63,6 +65,7 @@ class TestTTSProviderFactory:
 
         assert factory.elevenlabs_api_key == "test-elevenlabs-key"
         assert factory.openai_api_key == "test-openai-key"
+        assert factory.gemini_api_key == "test-gemini-key"
 
     @pytest.mark.asyncio
     async def test_placeholder_elevenlabs_voice_fails_before_provider_check(self, factory):
@@ -100,6 +103,22 @@ class TestTTSProviderFactory:
         assert isinstance(service, OpenAITTSService)
         assert service.config.api_key == "test_openai_key"
         assert service.config.default_voice_config.voice_id == "alloy"
+
+    @pytest.mark.asyncio
+    async def test_create_gemini_service(self, factory):
+        voice_config = VoiceConfig(provider="gemini", voice_id="Kore")
+        factory._health_cache["gemini"] = ProviderHealth.HEALTHY
+
+        service = await factory.create_tts_service(
+            voice_config,
+            provider_config={"model": "gemini-3.8-flash-tts", "style_prompt": "friendly"},
+        )
+
+        assert isinstance(service, GeminiTTSService)
+        assert service.config.api_key == "test_gemini_key"
+        assert service.config.model == "gemini-3.8-flash-tts"
+        assert service.config.style_prompt == "friendly"
+        await service.aclose()
 
     @pytest.mark.asyncio
     async def test_create_with_custom_config(self, factory, elevenlabs_voice_config):
@@ -285,6 +304,7 @@ class TestTTSProviderFactory:
         """Test clearing health cache."""
         factory._health_cache["elevenlabs"] = ProviderHealth.HEALTHY
         factory._health_cache["openai"] = ProviderHealth.HEALTHY
+        factory._health_cache["gemini"] = ProviderHealth.HEALTHY
 
         factory.clear_health_cache()
 
@@ -301,7 +321,8 @@ class TestTTSProviderFactory:
 
         assert health_status["elevenlabs"] == ProviderHealth.HEALTHY
         assert health_status["openai"] == ProviderHealth.HEALTHY
-        assert len(health_status) == 2
+        assert health_status["gemini"] == ProviderHealth.HEALTHY
+        assert len(health_status) == 3
 
     @pytest.mark.asyncio
     async def test_unknown_provider_health(self, factory):

@@ -14,13 +14,16 @@ persona:
     If you don't know something, say so clearly rather than guessing.
 
 llm:
-  provider: "openai"  # openai, ollama, vllm
-  model: "gpt-4"
+  provider: "gemini"  # gemini, openai, ollama, vllm
+  model: "gemini-3.8-flash"
   temperature: 0.7
   max_tokens: 150
 
 tts:
-  provider: "elevenlabs"  # elevenlabs, openai
+  provider: "gemini"  # gemini, elevenlabs, openai
+  model: "gemini-3.8-flash-tts"
+  voice_name: "Kore"
+  style_prompt: "Warm, empathetic, clear healthcare reception conversation."
   voice_settings:
     stability: 0.5
     similarity_boost: 0.75

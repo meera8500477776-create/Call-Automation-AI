@@ -96,6 +96,13 @@ def create_app(
         elif provider == "openai":
             app.state.tts_provider_config = {"response_format": "pcm"}
             app.state.tts_sample_rate = 24000
+        elif provider == "gemini":
+            app.state.tts_provider_config = {
+                "model": tenant_config.tts.model or "gemini-3.8-flash-tts",
+                "style_prompt": tenant_config.tts.style_prompt
+                or "Warm, friendly, natural customer-service conversation.",
+            }
+            app.state.tts_sample_rate = 24000
         else:
             app.state.tts_provider_config = None
             app.state.tts_sample_rate = 16000

@@ -71,7 +71,7 @@ This repository extends the original MVP with:
 - Multi-tenant architecture with zero-code deployment for new use cases
 - Ultra-low latency voice pipeline achieving median response times under 1000ms (target: 500ms)
 - HIPAA-compliant security with zero-trust architecture, TLS 1.2+ encryption, and AES-256 data protection
-- Dual LLM strategy supporting cloud providers (OpenAI) or local deployment (Ollama/vLLM) for data sovereignty
+- Gemini Flash as the default cloud LLM and TTS provider, with OpenAI, ElevenLabs, Ollama, and vLLM adapters retained as optional providers
 - Industry-specific adapters for healthcare (SMART-on-FHIR) and automotive (DMS) systems
 - Production-ready deployment with Docker, Kubernetes, and KEDA-based GPU auto-scaling
 - Comprehensive observability with LangSmith/Helicone integration and per-stage latency tracking
@@ -220,7 +220,7 @@ style Q fill:#7f0000,color:#ffffff,stroke:#ff5252
    - VAD (Silero) detects speech boundaries for natural turn-taking
    - STT (Deepgram Nova) transcribes audio to text with streaming interim results
    - LLM (OpenAI/Ollama/vLLM) processes transcript, classifies intent, extracts parameters
-   - TTS (ElevenLabs Flash v2.5/OpenAI) converts response to audio with emotional context
+   - TTS (Gemini Flash TTS by default; ElevenLabs/OpenAI optional) converts response to audio
 5. Tool Executor handles external API calls when LLM determines tool usage needed
 6. Security services encrypt data (AES-256) and authenticate API requests (OAuth 2.0)
 7. Monitoring services track per-stage latency and log all operations immutably
@@ -346,8 +346,8 @@ See the platform in action with demo videos in the `demo/` directory. Check out 
 Tenant configurations are defined in YAML or TOML files located in `config/tenants/`. Each tenant configuration specifies:
 
 - Persona and system prompt with voice-optimized instructions
-- LLM provider and model settings (OpenAI/Ollama/vLLM)
-- TTS provider and voice settings (ElevenLabs/OpenAI)
+- LLM provider and model settings (Gemini Flash by default; OpenAI/Ollama/vLLM optional)
+- TTS provider and voice settings (Gemini Flash TTS by default; ElevenLabs/OpenAI optional)
 - Available tools and API endpoints (FHIR/DMS/Custom)
 - Knowledge bases for domain-specific information
 - Operational constraints (max call duration, response brevity)
@@ -365,10 +365,15 @@ persona:
   voice_id: "elevenlabs_voice_id"
   system_prompt: "You are Sarah, a friendly medical receptionist..."
 llm:
-  provider: "openai"  # or "ollama", "vllm"
-  model: "gpt-4"
+  provider: "gemini"  # or "openai", "ollama", "vllm"
+  model: "gemini-3.8-flash"
   temperature: 0.7
   max_tokens: 150
+tts:
+  provider: "gemini"
+  model: "gemini-3.8-flash-tts"
+  voice_name: "Kore"
+  style_prompt: "Warm and friendly conversational speech."
 tools:
   - name: "search_appointments"
     type: "fhir"

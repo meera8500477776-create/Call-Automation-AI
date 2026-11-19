@@ -52,7 +52,10 @@ class PipecatOrchestrator:
         self._tenant_registry = tenant_registry
         self._session_manager = session_manager or SessionManager()
         self._settings = settings or Settings()
-        self._llm_factory = LLMProviderFactory(openai_api_key=self._settings.openai_api_key)
+        self._llm_factory = LLMProviderFactory(
+            openai_api_key=self._settings.openai_api_key,
+            gemini_api_key=self._settings.gemini_api_key,
+        )
         self._active_pipelines: dict[str, VoicePipeline] = {}
         logger.info("Pipecat Orchestrator initialized")
 
@@ -91,6 +94,14 @@ class PipecatOrchestrator:
             enable_early_llm_start=False,
         )
 
+        provider_tts_config = dict(tts_provider_config or {})
+        tenant_tts = getattr(tenant_config, "tts", None)
+        if tenant_tts:
+            if getattr(tenant_tts, "model", None):
+                provider_tts_config.setdefault("model", tenant_tts.model)
+            if getattr(tenant_tts, "style_prompt", None):
+                provider_tts_config.setdefault("style_prompt", tenant_tts.style_prompt)
+
         # Create pipeline configuration
         pipeline_config = PipelineConfig(
             session_id=session_id,
@@ -98,7 +109,7 @@ class PipecatOrchestrator:
             llm_service=llm_service,
             vad_config=vad_config,
             voice_config=voice_config,
-            tts_provider_config=tts_provider_config,
+            tts_provider_config=provider_tts_config,
             enable_barge_in=True,
             enable_interim_processing=False,
             streaming_config=streaming_config,
@@ -136,9 +147,16 @@ class PipecatOrchestrator:
 
     def _build_voice_config(self, tenant_config: TenantConfig) -> VoiceConfig:
         """Build voice configuration from tenant config."""
+        provider = getattr(tenant_config.tts, "provider", "gemini")
+        provider = getattr(provider, "value", provider)
+        voice_id = (
+            getattr(tenant_config.tts, "voice_name", None) or "Kore"
+            if provider == "gemini"
+            else tenant_config.persona.voice_id
+        )
         voice_config = VoiceConfig(
-            provider=getattr(tenant_config.tts, 'provider', "elevenlabs"),
-            voice_id=tenant_config.persona.voice_id,
+            provider=provider,
+            voice_id=voice_id,
             stability=getattr(tenant_config.tts, 'stability', 0.5),
             similarity_boost=getattr(tenant_config.tts, 'similarity_boost', 0.75),
             style=getattr(tenant_config.tts, 'style', 0.0),

@@ -23,6 +23,7 @@ def env_setup(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     """Set up test environment variables."""
     # Set test environment variables
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setenv("DEEPGRAM_API_KEY", "test-deepgram-key")
     monkeypatch.setenv("ELEVENLABS_API_KEY", "test-elevenlabs-key")
     monkeypatch.setenv("TWILIO_ACCOUNT_SID", "test-twilio-sid")
@@ -30,6 +31,8 @@ def env_setup(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     monkeypatch.setenv("ENCRYPTION_KEY", "test-encryption-key-32-bytes-long!")
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("LOG_FORMAT", "console")
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("TTS_PROVIDER", "gemini")
 
     yield
 

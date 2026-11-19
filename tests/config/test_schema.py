@@ -13,6 +13,8 @@ from voice_agent.config.schema import (
     TenantConfig,
     ToolDefinition,
     ToolType,
+    TTSConfig,
+    TTSProvider,
     VoiceSettings,
 )
 
@@ -109,6 +111,11 @@ class TestLLMConfig:
         llm = LLMConfig(provider=LLMProvider.OPENAI, model="gpt-4")
         assert llm.temperature == 0.7
         assert llm.max_tokens == 150
+        assert llm.timeout == 30.0
+
+    def test_gemini_provider_is_supported(self):
+        llm = LLMConfig(provider=LLMProvider.GEMINI, model="gemini-3.8-flash")
+        assert llm.provider == LLMProvider.GEMINI
 
     def test_temperature_range_validation(self):
         """Test that temperature is constrained to valid range."""
@@ -125,6 +132,10 @@ class TestLLMConfig:
 
         with pytest.raises(ValidationError):
             LLMConfig(provider=LLMProvider.OPENAI, model="gpt-4", max_tokens=-10)
+
+    def test_timeout_validation(self):
+        with pytest.raises(ValidationError):
+            LLMConfig(provider=LLMProvider.GEMINI, model="gemini-3.8-flash", timeout=0)
 
 
 class TestToolDefinition:
@@ -254,6 +265,21 @@ class TestTenantConfig:
         assert config.llm.provider == LLMProvider.OPENAI
         assert len(config.tools) == 0
         assert len(config.knowledge_bases) == 0
+
+    def test_gemini_llm_and_tts_settings_validate(self):
+        config = TenantConfig(
+            tenant_id="gemini_tenant",
+            persona=PersonaConfig(name="Alex", voice_id="legacy-local-id", system_prompt="Be helpful."),
+            llm=LLMConfig(provider=LLMProvider.GEMINI, model="gemini-3.8-flash"),
+            tts=TTSConfig(
+                provider=TTSProvider.GEMINI,
+                model="gemini-3.8-flash-tts",
+                voice_name="Kore",
+                style_prompt="Warm and friendly.",
+            ),
+        )
+        assert config.tts.provider == TTSProvider.GEMINI
+        assert config.tts.voice_name == "Kore"
 
     def test_tenant_config_with_tools(self):
         """Test tenant configuration with tools."""

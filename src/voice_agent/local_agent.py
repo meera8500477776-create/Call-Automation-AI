@@ -45,6 +45,13 @@ async def run_local_agent(tenant_id: str | None = None) -> None:
     elif provider == "openai":
         tts_provider_config = {"response_format": "pcm"}
         output_rate = 24000
+    elif provider == "gemini":
+        tts_provider_config = {
+            "model": tenant.tts.model or "gemini-3.8-flash-tts",
+            "style_prompt": tenant.tts.style_prompt
+            or "Warm, friendly, natural customer-service conversation.",
+        }
+        output_rate = 24000
     else:
         raise RuntimeError(f"Unsupported local TTS provider: {provider}")
 

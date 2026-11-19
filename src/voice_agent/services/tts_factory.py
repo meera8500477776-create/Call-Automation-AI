@@ -21,6 +21,7 @@ from .elevenlabs_tts_service import (
     VoiceConfig,
     validate_voice_config,
 )
+from .gemini_tts_service import GeminiTTSConfig, GeminiTTSService
 from .openai_tts_service import OpenAITTSConfig, OpenAITTSService
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ class TTSProviderFactory:
         self,
         elevenlabs_api_key: str | None = None,
         openai_api_key: str | None = None,
+        gemini_api_key: str | None = None,
         enable_failover: bool = True,
     ):
         """
@@ -56,12 +58,17 @@ class TTSProviderFactory:
             openai_api_key: OpenAI API key (if None, uses OPENAI_API_KEY env var)
             enable_failover: Enable automatic failover from ElevenLabs to OpenAI
         """
-        configured = Settings() if elevenlabs_api_key is None or openai_api_key is None else None
+        configured = Settings() if any(
+            key is None for key in (elevenlabs_api_key, openai_api_key, gemini_api_key)
+        ) else None
         self.elevenlabs_api_key = (
             elevenlabs_api_key if elevenlabs_api_key is not None else configured.elevenlabs_api_key
         )
         self.openai_api_key = (
             openai_api_key if openai_api_key is not None else configured.openai_api_key
+        )
+        self.gemini_api_key = (
+            gemini_api_key if gemini_api_key is not None else configured.gemini_api_key
         )
         self.enable_failover = enable_failover
 
@@ -77,7 +84,7 @@ class TTSProviderFactory:
         self,
         voice_config: VoiceConfig,
         provider_config: dict[str, Any] | None = None,
-    ) -> ElevenLabsTTSService | OpenAITTSService:
+    ) -> ElevenLabsTTSService | OpenAITTSService | GeminiTTSService:
         """
         Create TTS service instance based on configuration.
 
@@ -135,7 +142,7 @@ class TTSProviderFactory:
         self,
         voice_config: VoiceConfig,
         provider_config: dict[str, Any],
-    ) -> ElevenLabsTTSService | OpenAITTSService:
+    ) -> ElevenLabsTTSService | OpenAITTSService | GeminiTTSService:
         """
         Create provider instance without failover logic.
 
@@ -150,6 +157,19 @@ class TTSProviderFactory:
             ValueError: If provider is not supported
         """
         provider = voice_config.provider.lower()
+
+        if provider == "gemini":
+            gemini_config = GeminiTTSConfig(
+                api_key=provider_config.get("api_key", self.gemini_api_key),
+                default_voice_config=voice_config,
+                model=provider_config.get("model", "gemini-3.8-flash-tts"),
+                style_prompt=provider_config.get(
+                    "style_prompt", "Warm, friendly, natural customer-service conversation."
+                ),
+                timeout=provider_config.get("timeout", 45.0),
+                chunk_size=provider_config.get("chunk_size", 4096),
+            )
+            return GeminiTTSService(config=gemini_config)
 
         if provider == "elevenlabs":
             tts_config = TTSConfig(
@@ -178,7 +198,7 @@ class TTSProviderFactory:
         self,
         voice_config: VoiceConfig,
         provider_config: dict[str, Any],
-    ) -> ElevenLabsTTSService | OpenAITTSService:
+    ) -> ElevenLabsTTSService | OpenAITTSService | GeminiTTSService:
         """
         Create service with automatic failover to OpenAI.
 
@@ -235,7 +255,7 @@ class TTSProviderFactory:
         health checks.
 
         Args:
-            provider: Provider name ("elevenlabs" or "openai")
+        provider: Provider name ("gemini", "elevenlabs", or "openai")
 
         Returns:
             Provider health status
@@ -249,6 +269,9 @@ class TTSProviderFactory:
         try:
             if provider == "elevenlabs":
                 health = await self._check_elevenlabs_health()
+
+            elif provider == "gemini":
+                health = ProviderHealth.HEALTHY
 
             elif provider == "openai":
                 # OpenAI is always considered healthy (cloud service)
@@ -315,7 +338,7 @@ class TTSProviderFactory:
         Returns:
             Dictionary mapping provider names to health status
         """
-        providers = ["elevenlabs", "openai"]
+        providers = ["gemini", "elevenlabs", "openai"]
         health_status = {}
 
         for provider in providers:

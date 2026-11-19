@@ -102,7 +102,7 @@ class LLMConfig:
     Configuration for LLM service.
 
     Attributes:
-        provider: LLM provider ("openai", "ollama", "vllm")
+        provider: LLM provider ("gemini", "openai", "ollama", "vllm")
         model: Model identifier
         temperature: Sampling temperature (0.0-2.0)
         max_tokens: Maximum tokens in response
@@ -124,7 +124,7 @@ class LLMConfig:
 
     def __post_init__(self):
         """Validate configuration."""
-        if self.provider not in ["openai", "ollama", "vllm"]:
+        if self.provider not in ["gemini", "openai", "ollama", "vllm"]:
             raise ValueError(f"Invalid provider: {self.provider}")
         if not 0.0 <= self.temperature <= 2.0:
             raise ValueError(f"Temperature must be between 0.0 and 2.0, got {self.temperature}")

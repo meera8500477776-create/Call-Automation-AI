@@ -33,8 +33,10 @@ This guide covers deploying the Config-Driven Voice Agent Platform using Docker 
    Edit `.env` and add your API keys:
    ```bash
    DEEPGRAM_API_KEY=your_deepgram_key
-   OPENAI_API_KEY=your_openai_key
-   ELEVENLABS_API_KEY=your_elevenlabs_key
+   GEMINI_API_KEY=your_gemini_key
+   LLM_PROVIDER=gemini
+   TTS_PROVIDER=gemini
+   # Optional legacy adapters: OPENAI_API_KEY and ELEVENLABS_API_KEY
    TWILIO_ACCOUNT_SID=your_twilio_sid
    TWILIO_AUTH_TOKEN=your_twilio_token
    ```
@@ -62,6 +64,7 @@ This guide covers deploying the Config-Driven Voice Agent Platform using Docker 
      -p 8000:8000 \
      -e ENVIRONMENT=production \
      -e DEEPGRAM_API_KEY=$DEEPGRAM_API_KEY \
+     -e GEMINI_API_KEY=$GEMINI_API_KEY \
      -e OPENAI_API_KEY=$OPENAI_API_KEY \
      -e ELEVENLABS_API_KEY=$ELEVENLABS_API_KEY \
      -e TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID \
@@ -157,8 +160,11 @@ kubectl logs -n voice-agent -l app=voice-agent --tail=100
 | `ENVIRONMENT` | Deployment environment | `production`, `staging`, `development` |
 | `LOG_LEVEL` | Logging level | `INFO`, `DEBUG`, `WARNING` |
 | `DEEPGRAM_API_KEY` | Deepgram STT API key | `abc123...` |
-| `OPENAI_API_KEY` | OpenAI API key | `sk-...` |
-| `ELEVENLABS_API_KEY` | ElevenLabs TTS API key | `xyz789...` |
+| `GEMINI_API_KEY` | Gemini LLM and TTS API key | `...` |
+| `LLM_PROVIDER` | Conversational model provider | `gemini` |
+| `TTS_PROVIDER` | Speech synthesis provider | `gemini` |
+| `OPENAI_API_KEY` | Optional OpenAI adapter API key | `sk-...` |
+| `ELEVENLABS_API_KEY` | Optional ElevenLabs adapter API key | `...` |
 | `TWILIO_ACCOUNT_SID` | Twilio account SID | `AC...` |
 | `TWILIO_AUTH_TOKEN` | Twilio auth token | `...` |
 

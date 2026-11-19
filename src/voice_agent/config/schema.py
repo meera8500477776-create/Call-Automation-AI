@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 class LLMProvider(str, Enum):
     """Supported LLM providers."""
 
+    GEMINI = "gemini"
     OPENAI = "openai"
     OLLAMA = "ollama"
     VLLM = "vllm"
@@ -17,6 +18,7 @@ class LLMProvider(str, Enum):
 class TTSProvider(str, Enum):
     """Supported TTS providers."""
 
+    GEMINI = "gemini"
     ELEVENLABS = "elevenlabs"
     OPENAI = "openai"
 
@@ -70,6 +72,9 @@ class TTSConfig(BaseModel):
     """Text-to-Speech configuration."""
 
     provider: TTSProvider = Field(..., description="TTS provider")
+    model: str | None = Field(default=None, description="Provider-specific TTS model")
+    voice_name: str | None = Field(default=None, description="Provider-specific voice name")
+    style_prompt: str | None = Field(default=None, description="Natural-language delivery guidance")
     voice_settings: VoiceSettings | None = Field(
         default=None, description="Voice synthesis settings (ElevenLabs only)"
     )
@@ -87,6 +92,9 @@ class LLMConfig(BaseModel):
     )
     max_tokens: int = Field(
         default=150, gt=0, le=4096, description="Maximum tokens in response"
+    )
+    timeout: float = Field(
+        default=30.0, gt=0, le=300, description="Provider request timeout in seconds"
     )
 
     model_config = {"extra": "forbid"}

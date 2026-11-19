@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from src.voice_agent.services.gemini_llm_service import GeminiLLMService
 from src.voice_agent.services.llm_factory import (
     LLMProviderFactory,
     ProviderHealth,
@@ -26,6 +27,7 @@ def factory():
     """Create LLM provider factory instance."""
     return LLMProviderFactory(
         openai_api_key="test-key",
+        gemini_api_key="test-gemini-key",
         ollama_base_url="http://localhost:11434",
         vllm_base_url="http://localhost:8000",
         enable_failover=True,
@@ -75,6 +77,17 @@ class TestLLMProviderFactory:
         factory = LLMProviderFactory()
 
         assert factory.openai_api_key == "test-openai-key"
+        assert factory.gemini_api_key == "test-gemini-key"
+
+    @pytest.mark.asyncio
+    async def test_create_gemini_service(self, factory):
+        config = LLMConfig(provider="gemini", model="gemini-3.8-flash")
+
+        service = await factory.create_llm_service(config)
+
+        assert isinstance(service, GeminiLLMService)
+        assert service.config.model == "gemini-3.8-flash"
+        await service.aclose()
 
     @pytest.mark.asyncio
     async def test_create_openai_service(self, factory, openai_config):
