@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 from google import genai
@@ -33,14 +34,13 @@ class GeminiLLMService(LLMService):
             api_key=api_key,
             http_options=types.HttpOptions(timeout=int(config.timeout * 1000)),
         )
+        self._api_key = api_key
         self.max_retries = max(1, max_retries)
         self._model_validated = False
-        self._session_interactions: dict[str, str] = {}
 
     async def aclose(self) -> None:
         """Release the SDK's async HTTP transport."""
         await self.client.aio.aclose()
-        self._session_interactions.clear()
 
     async def list_available_models(self) -> list[str]:
         """Discover models enabled for this API key, without logging their data."""
@@ -53,21 +53,29 @@ class GeminiLLMService(LLMService):
         return names
 
     async def validate_model(self) -> None:
-        """Discover and validate the configured model when explicit validation is needed."""
+        """Confirm the configured model is listed and supports text generation."""
         if self._model_validated:
             return
         try:
-            available = await asyncio.wait_for(
-                self.list_available_models(), timeout=self.config.timeout
-            )
+            pager = await self.client.aio.models.list()
+            selected = self.config.model.removeprefix("models/")
+            selected_model = None
+            async for model in pager:
+                if getattr(model, "name", "").removeprefix("models/") == selected:
+                    selected_model = model
+                    break
         except Exception as exc:
             raise RuntimeError(
                 f"Could not discover Gemini models ({type(exc).__name__})"
             ) from exc
-        selected = self.config.model.removeprefix("models/")
-        if selected not in available:
+        if selected_model is None:
             raise RuntimeError(
                 f"Configured Gemini model '{selected}' is not available to this API key"
+            )
+        actions = getattr(selected_model, "supported_actions", []) or []
+        if "generateContent" not in actions:
+            raise RuntimeError(
+                f"Configured Gemini model '{selected}' does not support generateContent"
             )
         self._model_validated = True
 
@@ -79,77 +87,121 @@ class GeminiLLMService(LLMService):
         )
 
     @staticmethod
-    def _is_retryable(exc: Exception) -> bool:
-        code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-        if code in {408, 429, 500, 502, 503, 504}:
+    def _status_code(exc: Exception) -> int | None:
+        """Extract an HTTP status from SDK exception fields or its safe message."""
+        response = getattr(exc, "response", None)
+        for value in (
+            getattr(exc, "status_code", None),
+            getattr(exc, "code", None),
+            getattr(response, "status_code", None),
+        ):
+            try:
+                status = int(value)
+            except (TypeError, ValueError):
+                continue
+            if 400 <= status <= 599:
+                return status
+        match = re.search(r"\b([45]\d{2})\b", str(exc))
+        return int(match.group(1)) if match else None
+
+    @classmethod
+    def _is_retryable(cls, exc: Exception) -> bool:
+        if cls._status_code(exc) in {408, 429, 500, 502, 503, 504}:
             return True
         name = type(exc).__name__.casefold()
         return any(word in name for word in ("timeout", "connection", "temporar"))
 
+    def _error_summary(self, exc: Exception) -> str:
+        """Give callers actionable provider errors while redacting credentials."""
+        status = self._status_code(exc)
+        detail = str(exc).replace(self._api_key, "[REDACTED]")
+        detail = re.sub(r"(?i)([?&]key=)[^&\s'\"}]+", r"\1[REDACTED]", detail)
+        detail = re.sub(r"AIza[0-9A-Za-z_-]{30,}", "[REDACTED]", detail)
+        lowered = detail.casefold()
+        if status == 503 and "high demand" in lowered:
+            return "Google Gemini HTTP 503 UNAVAILABLE: the selected model is experiencing high demand"
+        if status == 504:
+            return "Google Gemini HTTP 504 DEADLINE_EXCEEDED: generation did not finish before Google's deadline"
+        if status == 429 and "insufficient_quota" in lowered:
+            return "Google Gemini HTTP 429: account quota is insufficient"
+        if status == 429:
+            return "Google Gemini HTTP 429: request rate or quota limit reached"
+        if status in {401, 403}:
+            return f"Google Gemini HTTP {status}: authentication or model permission was rejected"
+        if isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+            return f"Google Gemini request timed out after {self.config.timeout:g} seconds"
+        if status:
+            return f"Google Gemini HTTP {status}: {detail[:240]}"
+        return f"{type(exc).__name__}: {detail[:240]}"
+
+    def _build_contents(self, transcript: str, context: ConversationContext) -> list[types.Content]:
+        """Map local conversation history to Gemini's supported content roles."""
+        contents: list[types.Content] = []
+        history = context.conversation_history[-10:]
+        for turn in history:
+            role = turn.get("role", "user")
+            text = turn.get("content", "")
+            if not text or role not in {"user", "assistant", "model"}:
+                continue
+            contents.append(
+                types.Content(
+                    role="model" if role == "assistant" else "user",
+                    parts=[types.Part.from_text(text=text)],
+                )
+            )
+        if not history or history[-1].get("role") != "user" or history[-1].get("content") != transcript:
+            contents.append(
+                types.Content(role="user", parts=[types.Part.from_text(text=transcript)])
+            )
+        return contents
+
     async def _collect_stream(
-        self, transcript: str, context: ConversationContext
-    ) -> tuple[str, str | None, Any]:
-        session_id = context.session_id
-        previous_id = self._session_interactions.get(session_id)
-        stream = await self.client.aio.interactions.create(
+        self, transcript: str, context: ConversationContext, request_state: dict[str, bool]
+    ) -> tuple[str, Any]:
+        stream = await self.client.aio.models.generate_content_stream(
             model=self.config.model,
-            input=transcript,
-            system_instruction=self._system_instruction(),
-            previous_interaction_id=previous_id,
-            generation_config={
-                "temperature": self.config.temperature,
-                "top_p": self.config.top_p,
-                "max_output_tokens": self.config.max_tokens,
-            },
-            stream=True,
-            timeout=self.config.timeout,
+            contents=self._build_contents(transcript, context),
+            config=types.GenerateContentConfig(
+                system_instruction=self._system_instruction(),
+                temperature=self.config.temperature,
+                top_p=self.config.top_p,
+                max_output_tokens=self.config.max_tokens,
+            ),
         )
+        request_state["stream_opened"] = True
         chunks: list[str] = []
-        interaction_id: str | None = None
         usage: Any = None
         try:
-            async for event in stream:
-                event_type = getattr(event, "event_type", None)
-                interaction = getattr(event, "interaction", None)
-                if interaction is not None:
-                    interaction_id = getattr(interaction, "id", None) or interaction_id
-                    if interaction_id:
-                        self._session_interactions[context.session_id] = interaction_id
-                    usage = getattr(interaction, "usage", None) or usage
-                if event_type == "error":
-                    raise RuntimeError("Gemini interaction stream returned an error event")
-                if event_type != "step.delta":
-                    continue
-                delta = getattr(event, "delta", None)
-                if getattr(delta, "type", None) == "text":
-                    value = getattr(delta, "text", None)
-                    if value:
-                        chunks.append(value)
+            async for chunk in stream:
+                value = getattr(chunk, "text", None)
+                if value:
+                    chunks.append(value)
+                    request_state["text_emitted"] = True
+                usage = getattr(chunk, "usage_metadata", None) or usage
         finally:
             close_stream = getattr(stream, "aclose", None)
             if callable(close_stream):
                 await close_stream()
-        return "".join(chunks).strip(), interaction_id, usage
+        return "".join(chunks).strip(), usage
 
     async def generate_response(
         self,
         transcript: str,
         context: ConversationContext,
     ) -> LLMResponse:
-        """Generate a voice-ready response, including up to five prior turns."""
+        """Stream a voice-ready response with local multi-turn conversation history."""
         if not transcript.strip():
             raise ValueError("Transcript cannot be empty")
         last_error: Exception | None = None
-        initial_interaction_id = self._session_interactions.get(context.session_id)
         for attempt in range(self.max_retries):
+            request_state = {"stream_opened": False, "text_emitted": False}
             try:
-                raw_text, interaction_id, usage = await asyncio.wait_for(
-                    self._collect_stream(transcript, context), timeout=self.config.timeout
+                raw_text, usage = await asyncio.wait_for(
+                    self._collect_stream(transcript, context, request_state),
+                    timeout=self.config.timeout,
                 )
                 if not raw_text:
                     raise RuntimeError("Gemini returned no text content")
-                if interaction_id:
-                    self._session_interactions[context.session_id] = interaction_id
                 text = self.format_for_voice(raw_text)
                 intent = self.classify_intent(transcript)
                 parameters = self.extract_parameters(transcript, intent)
@@ -178,20 +230,18 @@ class GeminiLLMService(LLMService):
                 )
             except Exception as exc:
                 last_error = exc
-                # Retrying after an interaction has begun could duplicate a user turn.
-                interaction_started = (
-                    self._session_interactions.get(context.session_id) != initial_interaction_id
-                )
                 if (
                     attempt + 1 >= self.max_retries
                     or not self._is_retryable(exc)
-                    or interaction_started
+                    or request_state["stream_opened"]
+                    or request_state["text_emitted"]
                 ):
                     break
                 await asyncio.sleep(0.25 * (attempt + 1))
-        logger.error("Gemini generation failed (%s)", type(last_error).__name__ if last_error else "unknown")
+        summary = self._error_summary(last_error) if last_error else "unknown error"
+        logger.error("Gemini generation failed: %s", summary)
         raise RuntimeError(
-            f"Gemini response generation failed ({type(last_error).__name__ if last_error else 'unknown error'})"
+            f"Gemini response generation failed: {summary}"
         ) from last_error
 
     def _extract_emotional_tags(self, text: str) -> list[str]:

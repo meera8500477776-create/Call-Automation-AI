@@ -390,6 +390,22 @@ class TestAudioStreaming:
             await stt_service.send_audio(audio_data)
 
     @pytest.mark.asyncio
+    async def test_finalize_requests_deepgram_final_result(self, stt_service):
+        connection = Mock()
+        connection.send_finalize = AsyncMock()
+        stt_service._connection = connection
+        stt_service._state = ConnectionState.CONNECTED
+
+        await stt_service.finalize()
+
+        connection.send_finalize.assert_awaited_once_with()
+
+    @pytest.mark.asyncio
+    async def test_finalize_requires_connection(self, stt_service):
+        with pytest.raises(RuntimeError, match="Not connected"):
+            await stt_service.finalize()
+
+    @pytest.mark.asyncio
     async def test_send_empty_audio(self, stt_service):
         """Test sending empty audio chunk raises error."""
         with patch('src.voice_agent.services.stt_service.AsyncDeepgramClient') as mock_client_class:

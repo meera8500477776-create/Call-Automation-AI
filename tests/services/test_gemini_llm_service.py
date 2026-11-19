@@ -10,12 +10,8 @@ from voice_agent.services.llm_service import ConversationContext, LLMConfig
 
 class AsyncModels:
     def __init__(self):
-        self.list = AsyncMock(return_value=AsyncItems([SimpleNamespace(name="models/gemini-3.8-flash")]))
-
-
-class AsyncInteractions:
-    def __init__(self):
-        self.create = AsyncMock()
+        self.list = AsyncMock(return_value=AsyncItems([SimpleNamespace(name="models/gemini-3.8-flash", supported_actions=["generateContent"])]))
+        self.generate_content_stream = AsyncMock()
 
 
 class AsyncItems:
@@ -45,14 +41,13 @@ class AsyncResponses:
 @pytest.fixture
 def setup_gemini():
     models = AsyncModels()
-    interactions = AsyncInteractions()
-    client = SimpleNamespace(aio=SimpleNamespace(models=models, interactions=interactions, aclose=AsyncMock()))
+    client = SimpleNamespace(aio=SimpleNamespace(models=models, aclose=AsyncMock()))
     with patch("voice_agent.services.gemini_llm_service.genai.Client", return_value=client):
         service = GeminiLLMService(
             LLMConfig(provider="gemini", model="gemini-3.8-flash", system_prompt="Be Alex."),
             api_key="test-gemini-key",
         )
-    return service, models, interactions, client
+    return service, models, client
 
 
 @pytest.fixture
@@ -69,13 +64,11 @@ def conversation():
 
 @pytest.mark.asyncio
 async def test_streamed_response_preserves_context_and_does_not_duplicate_current_turn(setup_gemini, conversation):
-    service, models, interactions, _ = setup_gemini
-    interactions.create.return_value = AsyncResponses(
+    service, models, _ = setup_gemini
+    models.generate_content_stream.return_value = AsyncResponses(
         [
-            SimpleNamespace(event_type="interaction.created", interaction=SimpleNamespace(id="int-1", usage=None)),
-            SimpleNamespace(event_type="step.delta", delta=SimpleNamespace(type="text", text="Thanks, ")),
-            SimpleNamespace(event_type="step.delta", delta=SimpleNamespace(type="text", text="I found your order. Is there anything else?")),
-            SimpleNamespace(event_type="interaction.completed", interaction=SimpleNamespace(id="int-1", usage=SimpleNamespace(input_tokens=10, output_tokens=8, total_tokens=18))),
+            SimpleNamespace(text="Thanks, ", usage_metadata=None),
+            SimpleNamespace(text="I found your order. Is there anything else?", usage_metadata=SimpleNamespace(prompt_token_count=10, candidates_token_count=8, total_token_count=18)),
         ]
     )
 
@@ -84,55 +77,57 @@ async def test_streamed_response_preserves_context_and_does_not_duplicate_curren
     assert response.text.startswith("Thanks, I found your order.")
     assert response.metadata["provider"] == "gemini"
     assert models.list.await_count == 0
-    request = interactions.create.await_args.kwargs
-    assert request["input"] == "It is 123."
-    assert request["previous_interaction_id"] is None
-    assert request["system_instruction"].startswith("Be Alex.")
-    assert service._session_interactions["session-1"] == "int-1"
+    request = models.generate_content_stream.await_args.kwargs
+    assert [item.role for item in request["contents"]] == ["user", "model", "user"]
+    assert request["contents"][-1].parts[0].text == "It is 123."
+    assert request["config"].system_instruction.startswith("Be Alex.")
 
 
 @pytest.mark.asyncio
 async def test_second_turn_continues_gemini_interaction(setup_gemini, conversation):
-    service, _, interactions, _ = setup_gemini
-    interactions.create.side_effect = [
-        AsyncResponses([
-            SimpleNamespace(event_type="interaction.created", interaction=SimpleNamespace(id="int-1", usage=None)),
-            SimpleNamespace(event_type="step.delta", delta=SimpleNamespace(type="text", text="Your order is on its way.")),
-        ]),
-        AsyncResponses([
-            SimpleNamespace(event_type="interaction.created", interaction=SimpleNamespace(id="int-2", usage=None)),
-            SimpleNamespace(event_type="step.delta", delta=SimpleNamespace(type="text", text="I will keep it concise.")),
-        ]),
+    service, models, _ = setup_gemini
+    models.generate_content_stream.side_effect = [
+        AsyncResponses([SimpleNamespace(text="Your order is on its way.", usage_metadata=None)]),
+        AsyncResponses([SimpleNamespace(text="I will keep it concise.", usage_metadata=None)]),
     ]
 
     await service.generate_response("Where is my order?", conversation)
     response = await service.generate_response("Please remember I like short answers.", conversation)
 
     assert response.text == "I will keep it concise."
-    assert interactions.create.await_args_list[1].kwargs["previous_interaction_id"] == "int-1"
-    assert service._session_interactions["session-1"] == "int-2"
+    second_contents = models.generate_content_stream.await_args_list[1].kwargs["contents"]
+    assert [item.role for item in second_contents] == ["user", "model", "user", "user"]
+    assert second_contents[1].parts[0].text == "I can help. What is your order number?"
+    assert second_contents[-1].parts[0].text == "Please remember I like short answers."
 
 
 @pytest.mark.asyncio
 async def test_rejects_model_not_discovered(setup_gemini, conversation):
-    service, models, interactions, _ = setup_gemini
-    models.list.return_value = AsyncItems([SimpleNamespace(name="models/gemini-3.8-pro")])
+    service, models, _ = setup_gemini
+    models.list.return_value = AsyncItems([SimpleNamespace(name="models/gemini-3.8-pro", supported_actions=["generateContent"])])
 
     with pytest.raises(RuntimeError, match="not available"):
         await service.validate_model()
 
-    interactions.create.assert_not_awaited()
+    models.generate_content_stream.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_rejects_model_without_text_generation_action(setup_gemini):
+    service, models, _ = setup_gemini
+    models.list.return_value = AsyncItems([SimpleNamespace(name="models/gemini-3.8-flash", supported_actions=["embedContent"])])
+
+    with pytest.raises(RuntimeError, match="does not support generateContent"):
+        await service.validate_model()
 
 
 @pytest.mark.asyncio
 async def test_closes_async_sdk_client(setup_gemini):
-    service, _, _, client = setup_gemini
-    service._session_interactions["session-1"] = "interaction-1"
+    service, _, client = setup_gemini
 
     await service.aclose()
 
     client.aio.aclose.assert_awaited_once()
-    assert service._session_interactions == {}
 
 
 def test_gemini_service_requires_key():
@@ -148,3 +143,24 @@ def test_tenant_schema_config_can_initialize_gemini_service():
             api_key="test-gemini-key",
         )
     assert service.config.timeout == 30.0
+
+
+def test_high_demand_503_is_reported_and_retryable(setup_gemini):
+    service, _, _ = setup_gemini
+    error = RuntimeError("503 UNAVAILABLE: This model is currently experiencing high demand.")
+
+    assert service._is_retryable(error)
+    assert service._error_summary(error) == (
+        "Google Gemini HTTP 503 UNAVAILABLE: the selected model is experiencing high demand"
+    )
+
+
+def test_deadline_504_is_reported_without_exposing_a_key(setup_gemini):
+    service, _, _ = setup_gemini
+    error = RuntimeError("504 DEADLINE_EXCEEDED while using key=sk-test-sensitive-value")
+    service._api_key = "sk-test-sensitive-value"
+
+    assert service._is_retryable(error)
+    summary = service._error_summary(error)
+    assert summary.startswith("Google Gemini HTTP 504 DEADLINE_EXCEEDED:")
+    assert "sk-test-sensitive-value" not in summary

@@ -306,6 +306,15 @@ class STTService:
                 self._invoke_callback(self._error_callback, e)
             raise
 
+    async def finalize(self) -> None:
+        """Ask Deepgram to finalize audio already sent on the current stream."""
+        if not self.is_connected or self._connection is None:
+            raise RuntimeError("Not connected to Deepgram")
+        send_finalize = getattr(self._connection, "send_finalize", None)
+        if not callable(send_finalize):
+            raise RuntimeError("Installed Deepgram connection does not support Finalize")
+        await send_finalize()
+
     async def disconnect(self) -> None:
         """
         Close WebSocket connection and cleanup resources.
