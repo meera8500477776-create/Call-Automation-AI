@@ -293,6 +293,41 @@ cp .env.example .env
 pytest
 ```
 
+### Run the voice agent locally
+
+Set `VOICE_AGENT_TENANT_ID` in `.env` to a tenant file under `config/tenants/`.
+Replace example voice IDs with a real voice ID for the selected TTS provider.
+Install the optional Windows microphone and speaker dependency, then start the
+local full-duplex agent:
+
+```cmd
+.\.venv\Scripts\activate.bat
+pip install -e ".[dev,audio]"
+python -m voice_agent.local_agent --tenant customer_service_001
+```
+
+The local launcher streams 16 kHz mono PCM from the default microphone through
+the existing STT, LLM, and TTS pipeline. It uses PCM output and cancels queued
+speaker audio when the pipeline detects barge-in.
+
+### Run the Twilio webhook server
+
+Set `TWILIO_PUBLIC_URL` to the HTTPS URL from a tunnel and configure a valid
+`VOICE_AGENT_TENANT_ID`. Start the ASGI server from the repository root:
+
+```cmd
+.\.venv\Scripts\activate.bat
+python -m voice_agent.telephony.server
+```
+
+For local development, expose port 8000 with either `ngrok http 8000` or
+`cloudflared tunnel --url http://127.0.0.1:8000`. Set the Twilio voice webhook
+to `https://<tunnel-host>/twilio/voice` using HTTP POST. The webhook validates
+Twilio signatures by default and returns TwiML that opens a WSS Media Stream.
+The server decodes Twilio's 8 kHz μ-law input to the pipeline's 16 kHz PCM and
+encodes provider PCM output back to 8 kHz μ-law. No outbound call is initiated
+by starting the server.
+
 ### Quick Demo
 
 Run the example appointment scheduling workflow:

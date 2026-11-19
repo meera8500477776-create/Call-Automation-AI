@@ -134,7 +134,7 @@ async def initialized_pipeline(pipeline_config):
 
     # Mock WebSocket connection for STT
     mock_ws = MagicMock()
-    mock_ws.send = Mock()
+    mock_ws.send_media = AsyncMock()
 
     # Mock TTS service
     mock_tts_service = Mock()
@@ -575,55 +575,39 @@ class TestConcurrentProcessing:
         pipeline = initialized_pipeline
         llm_service = pipeline._llm_service
 
-        # Track LLM calls
-        llm_call_times = []
+        # Hold each request until the second one enters the LLM. This proves
+        # overlap without relying on wall-clock scheduling thresholds.
+        llm_call_count = 0
+        both_calls_started = asyncio.Event()
+        release_calls = asyncio.Event()
 
         original_generate = llm_service.generate_response
 
         async def tracked_generate(transcript, context):
-            llm_call_times.append(asyncio.get_event_loop().time())
-            await asyncio.sleep(0.1)  # Simulate processing time
+            nonlocal llm_call_count
+            llm_call_count += 1
+            if llm_call_count == 2:
+                both_calls_started.set()
+            await release_calls.wait()
             return await original_generate(transcript, context)
 
         llm_service.generate_response = tracked_generate
 
-        vad_result = VADResult(is_speech=True, confidence=0.9, timestamp=1.0)
-
-        with patch.object(pipeline._vad_module, 'process_audio', return_value=vad_result), \
-             patch.object(pipeline._stt_service, 'send_audio', new_callable=AsyncMock), \
+        with patch.object(pipeline._stt_service, 'send_audio', new_callable=AsyncMock), \
              patch.object(type(pipeline._stt_service), 'is_connected',
                          new_callable=PropertyMock, return_value=True):
 
-            # Send multiple transcripts rapidly
-            audio_data = b'\x00\x01' * 2048
-
-            await pipeline.process_audio_chunk(audio_data)
+            # Feed final transcripts directly; audio/VAD is covered elsewhere.
             await pipeline._handle_final_transcript("First request", {"confidence": 0.9})
-
-            await asyncio.sleep(0.05)  # Small delay
-
-            await pipeline.process_audio_chunk(audio_data)
             await pipeline._handle_final_transcript("Second request", {"confidence": 0.9})
 
-            # Wait for processing
-            await asyncio.sleep(0.5)
+            await asyncio.wait_for(both_calls_started.wait(), timeout=2)
+            release_calls.set()
 
             if pipeline._processing_tasks:
                 await asyncio.gather(*pipeline._processing_tasks, return_exceptions=True)
 
-            await asyncio.sleep(0.2)
-
-        # Verify multiple LLM calls were made
-        assert len(llm_call_times) >= 2, \
-            f"Expected at least 2 LLM calls, got {len(llm_call_times)}"
-
-        # With concurrent processing, calls should overlap
-        # (second call starts before first completes)
-        if len(llm_call_times) >= 2:
-            time_diff = llm_call_times[1] - llm_call_times[0]
-            # Second call should start within 0.1s of first (before first completes)
-            assert time_diff < 0.15, \
-                f"Concurrent processing not working, time diff: {time_diff}"
+        assert llm_call_count == 2, f"Expected 2 overlapping LLM calls, got {llm_call_count}"
 
     @pytest.mark.asyncio
     async def test_concurrent_tts_processing(self, initialized_pipeline):

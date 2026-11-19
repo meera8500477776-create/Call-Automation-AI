@@ -158,6 +158,7 @@ class TTSProviderFactory:
                 default_voice_config=voice_config,
                 model=provider_config.get("model", "tts-1"),
                 chunk_size=provider_config.get("chunk_size", 4096),
+                response_format=provider_config.get("response_format", "mp3"),
             )
             return OpenAITTSService(config=openai_config)
 

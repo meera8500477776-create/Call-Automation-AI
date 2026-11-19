@@ -8,6 +8,7 @@ from pathlib import Path
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
+from .loader import ConfigLoader
 from .schema import TenantConfig
 from .validator import ConfigValidator
 
@@ -91,6 +92,19 @@ class TenantRegistry:
             if config_file.exists():
                 return ConfigValidator.load_and_validate(config_file)
 
+        # Example and imported tenant files may have a descriptive filename
+        # while declaring their canonical tenant ID inside the document.
+        for config_file in sorted(self.config_dir.iterdir()):
+            if config_file.suffix.lower() not in {".yaml", ".yml", ".toml"}:
+                continue
+            try:
+                raw_config = ConfigLoader.load(config_file)
+            except (OSError, ValueError):
+                logger.warning("Skipping unreadable tenant config: %s", config_file.name)
+                continue
+            if isinstance(raw_config, dict) and raw_config.get("tenant_id") == tenant_id:
+                return ConfigValidator.load_and_validate(config_file)
+
         raise FileNotFoundError(
             f"Configuration file not found for tenant '{tenant_id}' in {self.config_dir}"
         )
@@ -111,6 +125,13 @@ class TenantRegistry:
             raise KeyError(f"No tenant mapping found for caller ID: {caller_id}")
 
         return self._caller_mapping[caller_id]
+
+    def register_caller(self, caller_id: str, tenant_id: str) -> None:
+        """Map a caller to a tenant for the current configured call route."""
+        if not caller_id or not tenant_id:
+            raise ValueError("caller_id and tenant_id are required")
+        with self._cache_lock:
+            self._caller_mapping[caller_id] = tenant_id
 
     def reload_config(self, tenant_id: str) -> None:
         """Hot-reload configuration for a specific tenant.

@@ -88,4 +88,3 @@ constraints:
   response_brevity: 3  # max sentences per response
   enable_barge_in: true
   transfer_to_human_on_error: true
-  max_transfer_attempts: 2

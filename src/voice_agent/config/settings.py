@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = Field(default="", description="ElevenLabs API key")
     twilio_account_sid: str = Field(default="", description="Twilio account SID")
     twilio_auth_token: str = Field(default="", description="Twilio auth token")
+    twilio_public_url: str = Field(default="", description="Public HTTPS URL for Twilio webhooks")
+    voice_agent_tenant_id: str = Field(default="", description="Tenant used for inbound/local calls")
+    twilio_validate_signature: bool = Field(default=True, description="Validate Twilio webhook signatures")
+    server_host: str = Field(default="0.0.0.0", description="HTTP server bind address")
+    server_port: int = Field(default=8000, ge=1, le=65535, description="HTTP server port")
 
     # LLM Configuration
     llm_provider: Literal["openai", "ollama", "vllm"] = Field(

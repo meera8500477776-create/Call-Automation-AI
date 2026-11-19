@@ -34,6 +34,7 @@ class OpenAITTSConfig:
     default_voice_config: VoiceConfig
     model: str = "tts-1"
     chunk_size: int = 4096
+    response_format: str = "mp3"
 
 
 class OpenAITTSService:
@@ -117,7 +118,7 @@ class OpenAITTSService:
                 model=self.config.model,
                 voice=voice_name,
                 input=text,
-                response_format="mp3",
+                response_format=self.config.response_format,
             )
 
             # Stream audio chunks

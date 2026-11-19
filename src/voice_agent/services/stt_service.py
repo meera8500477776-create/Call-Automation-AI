@@ -63,6 +63,7 @@ class STTService:
         # Deepgram client and connection
         self._client: AsyncDeepgramClient | None = None
         self._connection: Any | None = None
+        self._listen_task: asyncio.Task | None = None
 
         # Callback handlers
         self._interim_callback: Callable[[str, dict[str, Any]], None] | None = None
@@ -126,7 +127,7 @@ class STTService:
         Raises:
             ConnectionError: If connection fails after max retry attempts
         """
-        if self._state == ConnectionState.CONNECTED:
+        if self._state == ConnectionState.CONNECTED or self._connection is not None:
             logger.warning("Already connected, disconnecting first")
             await self.disconnect()
 
@@ -137,8 +138,9 @@ class STTService:
             # Initialize Deepgram client
             self._client = AsyncDeepgramClient(api_key=self.config.api_key)
 
-            # Create live transcription connection using v2 API
-            self._connection = await self._client.listen.v2.connect(
+            # Nova models use the Listen V1 endpoint. Listen V2 is the Flux
+            # conversational endpoint and does not accept Nova model names.
+            self._connection = await self._client.listen.v1.connect(
                 model=self.config.model,
                 language=self.config.language,
                 interim_results=self.config.interim_results,
@@ -146,7 +148,7 @@ class STTService:
                 smart_format=self.config.smart_format,
                 diarize=self.config.diarize,
                 encoding=self.config.encoding,
-                sample_rate=str(self.config.sample_rate),
+                sample_rate=self.config.sample_rate,
                 channels=self.config.channels,
             ).__aenter__()
 
@@ -156,8 +158,11 @@ class STTService:
             self._connection.on(EventType.ERROR, self._on_error)
             self._connection.on(EventType.CLOSE, self._on_close)
 
-            # Start listening
-            await self._connection.start_listening()
+            # start_listening runs the receive loop until the stream closes;
+            # keep it alive in the background so connect() can return and
+            # send_audio() can stream microphone frames concurrently.
+            self._listen_task = asyncio.create_task(self._connection.start_listening())
+            self._listen_task.add_done_callback(self._on_listener_done)
 
             self._state = ConnectionState.CONNECTED
             self._reconnect_attempts = 0
@@ -209,7 +214,7 @@ class STTService:
             raise ValueError("Audio chunk cannot be empty")
 
         try:
-            self._connection.send(audio_chunk)
+            await self._connection.send_media(audio_chunk)
             logger.debug("Sent audio chunk: %d bytes", len(audio_chunk))
 
         except Exception as e:
@@ -223,11 +228,21 @@ class STTService:
         """
         Close WebSocket connection and cleanup resources.
         """
-        if self._state == ConnectionState.DISCONNECTED:
+        if (
+            self._state == ConnectionState.DISCONNECTED
+            and self._connection is None
+            and self._listen_task is None
+        ):
             logger.debug("Already disconnected")
             return
 
         try:
+            if self._listen_task:
+                if not self._listen_task.done():
+                    self._listen_task.cancel()
+                await asyncio.gather(self._listen_task, return_exceptions=True)
+                self._listen_task = None
+
             if self._connection:
                 await self._connection.__aexit__(None, None, None)
                 self._connection = None
@@ -243,6 +258,19 @@ class STTService:
             raise
         finally:
             self._session_id = None
+
+    def _on_listener_done(self, task: asyncio.Task) -> None:
+        """Retrieve listener task errors and update connection state."""
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error:
+            self._state = ConnectionState.ERROR
+            logger.error("Deepgram listener stopped with an error: %s", error)
+            if self._error_callback:
+                self._error_callback(error)
+        elif self._state == ConnectionState.CONNECTED:
+            self._state = ConnectionState.DISCONNECTED
 
     def _on_open(self, *args, **kwargs) -> None:
         """

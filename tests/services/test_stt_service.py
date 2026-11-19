@@ -5,6 +5,7 @@ Tests WebSocket connection management, audio streaming, callback handlers,
 and error handling for the Deepgram STT service wrapper.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -112,15 +113,21 @@ class TestConnectionManagement:
             mock_connection = AsyncMock()
             mock_connection.__aenter__ = AsyncMock(return_value=mock_connection)
             mock_connection.__aexit__ = AsyncMock()
-            mock_connection.start_listening = AsyncMock()
+            listening_started = asyncio.Event()
+
+            async def keep_listening():
+                listening_started.set()
+                await asyncio.Event().wait()
+
+            mock_connection.start_listening = AsyncMock(side_effect=keep_listening)
             mock_connection.on = Mock()
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen
@@ -128,6 +135,7 @@ class TestConnectionManagement:
 
             # Connect
             await stt_service.connect("test_session_123")
+            await listening_started.wait()
 
             # Verify state
             assert stt_service.state == ConnectionState.CONNECTED
@@ -135,7 +143,9 @@ class TestConnectionManagement:
             assert stt_service._session_id == "test_session_123"
 
             # Verify connection was started
-            mock_connection.start_listening.assert_called_once()
+            mock_connection.start_listening.assert_awaited_once()
+            assert not stt_service._listen_task.done()
+            await stt_service.disconnect()
 
     @pytest.mark.asyncio
     async def test_connect_failure_with_retry(self, stt_service):
@@ -158,11 +168,11 @@ class TestConnectionManagement:
             mock_connection.on = Mock()
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen
@@ -185,11 +195,11 @@ class TestConnectionManagement:
             mock_connection.__aenter__ = AsyncMock(side_effect=Exception("Connection failed"))
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen
@@ -217,11 +227,11 @@ class TestConnectionManagement:
             mock_connection.on = Mock()
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen
@@ -259,15 +269,15 @@ class TestAudioStreaming:
             mock_connection = AsyncMock()
             mock_connection.__aenter__ = AsyncMock(return_value=mock_connection)
             mock_connection.start_listening = AsyncMock()
-            mock_connection.send = Mock()
+            mock_connection.send_media = AsyncMock()
             mock_connection.on = Mock()
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen
@@ -281,7 +291,7 @@ class TestAudioStreaming:
             await stt_service.send_audio(audio_data)
 
             # Verify audio was sent
-            mock_connection.send.assert_called_once_with(audio_data)
+            mock_connection.send_media.assert_awaited_once_with(audio_data)
 
     @pytest.mark.asyncio
     async def test_send_audio_not_connected(self, stt_service):
@@ -302,11 +312,11 @@ class TestAudioStreaming:
             mock_connection.on = Mock()
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen
@@ -454,15 +464,15 @@ class TestErrorHandling:
             mock_connection = AsyncMock()
             mock_connection.__aenter__ = AsyncMock(return_value=mock_connection)
             mock_connection.start_listening = AsyncMock()
-            mock_connection.send = Mock(side_effect=Exception("Network error"))
+            mock_connection.send_media = AsyncMock(side_effect=Exception("Network error"))
             mock_connection.on = Mock()
 
             mock_connect = Mock(return_value=mock_connection)
-            mock_v2 = Mock()
-            mock_v2.connect = mock_connect
+            mock_v1 = Mock()
+            mock_v1.connect = mock_connect
 
             mock_listen = Mock()
-            mock_listen.v2 = mock_v2
+            mock_listen.v1 = mock_v1
 
             mock_client = Mock()
             mock_client.listen = mock_listen

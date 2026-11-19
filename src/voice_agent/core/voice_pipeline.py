@@ -9,6 +9,7 @@ Supports concurrent processing, barge-in, and streaming optimizations.
 """
 
 import asyncio
+import copy
 import logging
 import time
 from collections.abc import Callable
@@ -160,6 +161,7 @@ class VoicePipeline:
         self._llm_response_callback: Callable[[LLMResponse], None] | None = None
         self._audio_generated_callback: Callable[[bytes], None] | None = None
         self._latency_callback: Callable[[LatencyMetrics], None] | None = None
+        self._interruption_callback: Callable[[], None] | None = None
 
         # Barge-in state
         self._barge_in_enabled = config.enable_barge_in
@@ -280,9 +282,10 @@ class VoicePipeline:
                 except asyncio.CancelledError:
                     pass
 
-            # Disconnect STT service
-            if self._stt_service.is_connected:
-                await self._stt_service.disconnect()
+            # Disconnect even after a provider close event has already changed
+            # state to DISCONNECTED; the adapter may still own a listener task
+            # or an entered WebSocket context that needs cleanup.
+            await self._stt_service.disconnect()
 
             # Reset VAD
             self._vad_module.reset()
@@ -344,6 +347,10 @@ class VoicePipeline:
         """
         self._latency_callback = callback
         logger.debug("Latency metric callback registered")
+
+    def on_interruption(self, callback: Callable[[], None]) -> None:
+        """Register a callback to clear device playback after barge-in."""
+        self._interruption_callback = callback
 
     def enable_barge_in(self, enabled: bool = True) -> None:
         """
@@ -560,35 +567,36 @@ class VoicePipeline:
             transcript: User transcript to process
         """
         async with self._llm_semaphore:
-            async with self._processing_lock:
-                try:
+            try:
+                async with self._processing_lock:
                     # Add user turn to context
                     self._context.conversation_history.append({
                         "role": "user",
                         "content": transcript,
                     })
+                    request_context = copy.deepcopy(self._context)
 
-                    # Start LLM timer
-                    self._start_latency_timer("llm_total")
-                    self._start_latency_timer("llm_ttft")
+                # Measure each request locally so concurrent requests don't
+                # overwrite one another's latency timers.
+                llm_started = time.perf_counter()
 
-                    # Generate LLM response
-                    logger.debug("Generating LLM response for: %s", transcript)
-                    llm_response = await self._llm_service.generate_response(
-                        transcript=transcript,
-                        context=self._context,
-                    )
+                # Generate LLM response without holding the conversation lock.
+                logger.debug("Generating LLM response for: %s", transcript)
+                llm_response = await self._llm_service.generate_response(
+                    transcript=transcript,
+                    context=request_context,
+                )
 
-                    # Record TTFT (approximation - actual TTFT would need streaming support)
-                    llm_ttft = self._end_latency_timer("llm_ttft")
-                    self._record_latency("llm_ttft", llm_ttft)
+                # Record TTFT (approximation - actual TTFT would need streaming support)
+                llm_elapsed = time.perf_counter() - llm_started
+                self._record_latency("llm_ttft", llm_elapsed)
 
-                    logger.info("LLM response generated: %s", llm_response.text[:100])
+                logger.info("LLM response generated: %s", llm_response.text[:100])
 
-                    # Record total LLM time
-                    llm_total = self._end_latency_timer("llm_total")
-                    self._record_latency("llm_total", llm_total)
+                # Record total LLM time
+                self._record_latency("llm_total", llm_elapsed)
 
+                async with self._processing_lock:
                     # Update context with extracted parameters
                     self._context.extracted_parameters.update(llm_response.parameters)
 
@@ -598,23 +606,20 @@ class VoicePipeline:
                         "content": llm_response.text,
                     })
 
-                    # Notify callback
-                    if self._llm_response_callback:
-                        self._llm_response_callback(llm_response)
+                # Notify callback
+                if self._llm_response_callback:
+                    self._llm_response_callback(llm_response)
 
-                    # Generate audio response (concurrent if enabled)
-                    if self._streaming_config.enable_concurrent_processing:
-                        task = asyncio.create_task(self._generate_audio(llm_response))
-                        self._processing_tasks.append(task)
-                    else:
-                        await self._generate_audio(llm_response)
+                # Generate audio response (concurrent if enabled)
+                if self._streaming_config.enable_concurrent_processing:
+                    task = asyncio.create_task(self._generate_audio(llm_response))
+                    self._processing_tasks.append(task)
+                else:
+                    await self._generate_audio(llm_response)
 
-                except Exception as e:
-                    logger.error("Error processing LLM: %s", str(e))
-                    # Clean up timers
-                    self._stage_timers.pop("llm_total", None)
-                    self._stage_timers.pop("llm_ttft", None)
-                    raise
+            except Exception as e:
+                logger.error("Error processing LLM: %s", str(e))
+                raise
 
     async def _generate_audio(self, llm_response: LLMResponse) -> None:
         """
@@ -723,6 +728,8 @@ class VoicePipeline:
             logger.info("Cancelling current TTS due to barge-in")
             self._current_tts_task.cancel()
             self._is_agent_speaking = False
+            if self._interruption_callback:
+                self._interruption_callback()
 
     def _handle_speech_start(self, timestamp: float) -> None:
         """

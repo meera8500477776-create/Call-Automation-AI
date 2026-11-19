@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from voice_agent.telephony import twilio_integration as twilio_integration_module
 from voice_agent.telephony.twilio_integration import (
     CallMetadata,
     CallStatus,
@@ -219,6 +220,24 @@ class TestTwilioIntegration:
             await twilio_integration.send_audio(b"audio_data")
 
     @pytest.mark.asyncio
+    async def test_clear_audio_buffer_sends_twilio_clear_frame(self, twilio_integration):
+        """Barge-in clears locally queued media and Twilio's playback buffer."""
+        websocket = AsyncMock()
+        twilio_integration._websocket = websocket
+        twilio_integration._is_connected = True
+        twilio_integration._stream_sid = "ST123456"
+        await twilio_integration._audio_buffer.put(b"queued audio")
+
+        twilio_integration.clear_audio_buffer()
+        send_task = asyncio.create_task(twilio_integration._send_loop())
+        await asyncio.sleep(0)
+        send_task.cancel()
+        await send_task
+
+        sent = json.loads(websocket.send.await_args.args[0])
+        assert sent == {"event": "clear", "streamSid": "ST123456"}
+
+    @pytest.mark.asyncio
     async def test_send_audio_connected(self, twilio_integration, mock_websocket):
         """Test sending audio when connected."""
         with patch("voice_agent.telephony.twilio_integration.websockets.connect") as mock_connect:
@@ -330,10 +349,15 @@ class TestTwilioIntegration:
         audio_callback.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_handle_stop_event(self, twilio_integration):
+    async def test_handle_stop_event(self, twilio_integration, monkeypatch):
         """Test handling stop event from Twilio."""
         end_callback = MagicMock()
         twilio_integration.on_call_ended(end_callback)
+
+        # Model elapsed time with a controlled monotonic clock. A real call can
+        # finish within the host wall clock's timestamp resolution.
+        ticks = iter((1_000_000_000, 2_250_000_000))
+        monkeypatch.setattr(twilio_integration_module.time, "monotonic_ns", lambda: next(ticks))
 
         # Set up call metadata
         twilio_integration._call_metadata = CallMetadata(
@@ -353,7 +377,7 @@ class TestTwilioIntegration:
         assert not twilio_integration.is_active
         assert twilio_integration.call_metadata.status == CallStatus.COMPLETED
         assert twilio_integration.call_metadata.end_time is not None
-        assert twilio_integration.call_metadata.duration_seconds > 0
+        assert twilio_integration.call_metadata.duration_seconds == 1.25
 
         end_callback.assert_called_once()
 

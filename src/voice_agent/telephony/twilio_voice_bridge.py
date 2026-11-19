@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from ..core.pipecat_orchestrator import CallMetadata as OrchestratorCallMetadata
 from ..core.pipecat_orchestrator import PipecatOrchestrator
 from ..core.voice_pipeline import LatencyMetrics, VoicePipeline
+from ..services.audio_utils import pcm16_to_twilio_mulaw, twilio_mulaw_to_pcm16k
 from .twilio_integration import CallMetadata as TwilioCallMetadata
 from .twilio_integration import TwilioIntegration
 
@@ -33,6 +34,9 @@ class BridgeConfig:
     session_id: str
     enable_audio_logging: bool = False
     audio_buffer_size: int = 8192
+    convert_twilio_audio: bool = False
+    tts_sample_rate: int = 16000
+    tts_provider_config: dict | None = None
 
 
 class TwilioVoiceBridge:
@@ -65,6 +69,10 @@ class TwilioVoiceBridge:
         self._pipeline: VoicePipeline | None = None
         self._is_active = False
         self._audio_routing_task: asyncio.Task | None = None
+        self._background_tasks: set[asyncio.Task] = set()
+        self._session_start_task: asyncio.Task | None = None
+        self._session_stop_lock = asyncio.Lock()
+        self._audio_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=500)
 
         logger.info(
             "Twilio-Voice Bridge initialized (session: %s)",
@@ -103,6 +111,7 @@ class TwilioVoiceBridge:
         self._twilio.on_error(self._handle_twilio_error)
 
         self._is_active = True
+        self._audio_routing_task = self._spawn(self._route_audio_queue())
         logger.info("Twilio-Voice Bridge started")
 
     async def stop(self) -> None:
@@ -119,7 +128,16 @@ class TwilioVoiceBridge:
 
         self._is_active = False
 
-        # Cancel audio routing task
+        # Wait for an in-flight session start before stopping the session. This
+        # prevents a fast disconnect from leaving a pipeline alive in the
+        # orchestrator after the WebSocket has closed.
+        if self._session_start_task and not self._session_start_task.done():
+            await asyncio.gather(self._session_start_task, return_exceptions=True)
+
+        # Flush received chunks before shutting down the STT pipeline.
+        await self._audio_queue.join()
+
+        # Cancel the idle audio queue worker after its pending chunks complete.
         if self._audio_routing_task and not self._audio_routing_task.done():
             self._audio_routing_task.cancel()
             try:
@@ -127,13 +145,14 @@ class TwilioVoiceBridge:
             except asyncio.CancelledError:
                 pass
 
-        # Stop pipeline if active
-        if self._pipeline:
-            try:
-                await self._orchestrator.stop_session(self.config.session_id)
-                self._pipeline = None
-            except Exception as e:
-                logger.error("Error stopping pipeline: %s", str(e))
+        await self._stop_session()
+
+        pending = [
+            task for task in self._background_tasks
+            if task is not asyncio.current_task() and not task.done()
+        ]
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
 
         logger.info("Twilio-Voice Bridge stopped")
 
@@ -154,6 +173,9 @@ class TwilioVoiceBridge:
             call_metadata.caller_id
         )
 
+        if not self.config.session_id:
+            self.config.session_id = call_metadata.call_sid
+
         # Create orchestrator call metadata
         orchestrator_metadata = OrchestratorCallMetadata(
             caller_id=call_metadata.caller_id,
@@ -170,7 +192,7 @@ class TwilioVoiceBridge:
         )
 
         # Start session asynchronously
-        asyncio.create_task(self._start_session(orchestrator_metadata))
+        self._session_start_task = self._spawn(self._start_session(orchestrator_metadata))
 
     async def _start_session(self, call_metadata: OrchestratorCallMetadata) -> None:
         """
@@ -185,11 +207,13 @@ class TwilioVoiceBridge:
                 session_id=self.config.session_id,
                 caller_id=call_metadata.caller_id,
                 call_metadata=call_metadata,
+                tts_provider_config=self.config.tts_provider_config,
             )
 
             # Register pipeline callbacks for audio output
             self._pipeline.on_audio_generated(self._handle_pipeline_audio)
             self._pipeline.on_latency_metric(self._handle_latency_metrics)
+            self._pipeline.on_interruption(self._twilio.clear_audio_buffer)
 
             logger.info("Voice pipeline session started: %s", self.config.session_id)
 
@@ -217,28 +241,34 @@ class TwilioVoiceBridge:
         )
 
         # Stop session asynchronously
-        asyncio.create_task(self._stop_session())
+        self._spawn(self._stop_session())
 
     async def _stop_session(self) -> None:
         """Stop voice pipeline session and cleanup."""
-        try:
-            if self._pipeline:
-                summary = await self._orchestrator.stop_session(
-                    session_id=self.config.session_id,
-                    persist=True,
-                )
+        await self._audio_queue.join()
+        async with self._session_stop_lock:
+            start_task = self._session_start_task
+            if start_task and start_task is not asyncio.current_task() and not start_task.done():
+                await asyncio.gather(start_task, return_exceptions=True)
 
-                if summary:
-                    logger.info(
-                        "Session stopped: %s (turns: %d)",
-                        self.config.session_id,
-                        summary.get("turn_count", 0)
+            try:
+                if self._pipeline:
+                    summary = await self._orchestrator.stop_session(
+                        session_id=self.config.session_id,
+                        persist=True,
                     )
 
-                self._pipeline = None
+                    if summary:
+                        logger.info(
+                            "Session stopped: %s (turns: %d)",
+                            self.config.session_id,
+                            summary.get("turn_count", 0)
+                        )
 
-        except Exception as e:
-            logger.error("Error stopping session: %s", str(e))
+                    self._pipeline = None
+
+            except Exception as e:
+                logger.error("Error stopping session: %s", str(e))
 
     def _handle_twilio_audio(self, audio_data: bytes) -> None:
         """
@@ -258,8 +288,27 @@ class TwilioVoiceBridge:
         if self.config.enable_audio_logging:
             logger.debug("Received audio from Twilio: %d bytes", len(audio_data))
 
-        # Route audio to pipeline asynchronously
-        asyncio.create_task(self._route_audio_to_pipeline(audio_data))
+        # Keep audio in order and bound pending work if provider processing
+        # falls behind the incoming stream.
+        try:
+            self._audio_queue.put_nowait(audio_data)
+        except asyncio.QueueFull:
+            logger.warning("Audio routing queue is full; dropping an incoming chunk")
+
+    async def _route_audio_queue(self) -> None:
+        """Process incoming chunks serially to preserve stream order."""
+        try:
+            while self._is_active or not self._audio_queue.empty():
+                audio_data = await self._audio_queue.get()
+                try:
+                    start_task = self._session_start_task
+                    if start_task and not start_task.done():
+                        await asyncio.gather(start_task, return_exceptions=True)
+                    await self._route_audio_to_pipeline(audio_data)
+                finally:
+                    self._audio_queue.task_done()
+        except asyncio.CancelledError:
+            raise
 
     async def _route_audio_to_pipeline(self, audio_data: bytes) -> None:
         """
@@ -270,6 +319,8 @@ class TwilioVoiceBridge:
         """
         try:
             if self._pipeline and self._pipeline.is_active:
+                if self.config.convert_twilio_audio:
+                    audio_data = twilio_mulaw_to_pcm16k(audio_data)
                 await self._pipeline.process_audio_chunk(audio_data)
         except Exception as e:
             logger.error("Error routing audio to pipeline: %s", str(e))
@@ -292,8 +343,15 @@ class TwilioVoiceBridge:
         if self.config.enable_audio_logging:
             logger.debug("Sending audio to Twilio: %d bytes", len(audio_data))
 
+        if self.config.convert_twilio_audio:
+            try:
+                audio_data = pcm16_to_twilio_mulaw(audio_data, self.config.tts_sample_rate)
+            except ValueError:
+                logger.exception("Invalid TTS PCM chunk; dropping it")
+                return
+
         # Route audio to Twilio asynchronously
-        asyncio.create_task(self._route_audio_to_twilio(audio_data))
+        self._spawn(self._route_audio_to_twilio(audio_data))
 
     async def _route_audio_to_twilio(self, audio_data: bytes) -> None:
         """
@@ -333,7 +391,14 @@ class TwilioVoiceBridge:
         logger.error("Twilio error: %s", str(error))
 
         # Stop session on error
-        asyncio.create_task(self._stop_session())
+        self._spawn(self._stop_session())
+
+    def _spawn(self, coroutine) -> asyncio.Task:
+        """Create a tracked background task and surface unexpected failures."""
+        task = asyncio.create_task(coroutine)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
 
     def get_session_id(self) -> str:
         """

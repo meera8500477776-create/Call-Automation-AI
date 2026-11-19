@@ -9,6 +9,7 @@ import asyncio
 import base64
 import json
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -16,7 +17,6 @@ from enum import Enum
 from typing import Any
 
 import websockets
-from websockets.client import WebSocketClientProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,9 @@ class CallMetadata:
     from_state: str | None = None
     from_country: str | None = None
     custom_parameters: dict[str, Any] = field(default_factory=dict)
+    _start_monotonic_ns: int = field(
+        default_factory=lambda: time.monotonic_ns(), repr=False, compare=False
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert metadata to dictionary."""
@@ -125,7 +128,7 @@ class TwilioIntegration:
             config: Twilio configuration
         """
         self.config = config
-        self._websocket: WebSocketClientProtocol | None = None
+        self._websocket: Any | None = None
         self._call_metadata: CallMetadata | None = None
         self._is_connected = False
         self._is_active = False
@@ -139,7 +142,7 @@ class TwilioIntegration:
         self._on_error: Callable[[Exception], None] | None = None
 
         # Audio buffering
-        self._audio_buffer: asyncio.Queue = asyncio.Queue()
+        self._audio_buffer: asyncio.Queue[bytes | None] = asyncio.Queue()
         self._receive_task: asyncio.Task | None = None
         self._send_task: asyncio.Task | None = None
 
@@ -240,6 +243,25 @@ class TwilioIntegration:
                 self._on_error(e)
             raise ConnectionError(f"Failed to connect to Twilio: {e}") from e
 
+    async def serve(self, websocket: Any) -> None:
+        """Run the Twilio stream loops over an already accepted WebSocket.
+
+        ``websocket`` must provide async ``recv()``, ``send(str)``, and
+        ``close()`` methods. This supports server-side adapters such as
+        FastAPI while retaining the same lifecycle and callbacks as ``connect``.
+        """
+        if self._is_connected:
+            raise RuntimeError("Twilio integration is already connected")
+
+        self._websocket = websocket
+        self._is_connected = True
+        self._receive_task = asyncio.create_task(self._receive_loop())
+        self._send_task = asyncio.create_task(self._send_loop())
+        try:
+            await self._receive_task
+        finally:
+            await self.disconnect()
+
     async def disconnect(self) -> None:
         """Disconnect from Twilio and cleanup resources."""
         logger.info("Disconnecting from Twilio")
@@ -284,6 +306,16 @@ class TwilioIntegration:
         # Add to send queue
         await self._audio_buffer.put(audio_data)
 
+    def clear_audio_buffer(self) -> None:
+        """Discard queued playback and ask Twilio to clear its media buffer."""
+        while True:
+            try:
+                self._audio_buffer.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        if self._is_connected and self._stream_sid:
+            self._audio_buffer.put_nowait(None)
+
     async def _send_loop(self) -> None:
         """Background task to send audio from buffer to Twilio."""
         try:
@@ -292,6 +324,12 @@ class TwilioIntegration:
                 audio_data = await self._audio_buffer.get()
 
                 if not self._websocket or not self._stream_sid:
+                    continue
+
+                if audio_data is None:
+                    await self._websocket.send(
+                        json.dumps({"event": "clear", "streamSid": self._stream_sid})
+                    )
                     continue
 
                 # Encode audio as base64
@@ -322,6 +360,8 @@ class TwilioIntegration:
             while self._is_connected and self._websocket:
                 # Receive message
                 message_str = await self._websocket.recv()
+                if message_str is None:
+                    break
                 message = json.loads(message_str)
 
                 # Handle message based on event type
@@ -443,9 +483,14 @@ class TwilioIntegration:
             self._call_metadata.end_time = datetime.now()
 
             # Calculate duration
-            duration = (
-                self._call_metadata.end_time - self._call_metadata.start_time
-            ).total_seconds()
+            # Wall-clock timestamps can have a coarser resolution than a fast
+            # stop event, producing a zero duration for a call that did run.
+            # A monotonic clock measures elapsed time without clock adjustments.
+            duration = max(
+                0.0,
+                (time.monotonic_ns() - self._call_metadata._start_monotonic_ns)
+                / 1_000_000_000,
+            )
             self._call_metadata.duration_seconds = duration
 
             logger.info(

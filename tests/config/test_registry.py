@@ -47,6 +47,25 @@ llm:
         assert config.tenant_id == "test_tenant"
         assert config.persona.name == "Sarah"
 
+    def test_load_tenant_by_id_when_filename_is_descriptive(self, temp_config_dir: Path):
+        """Resolve the canonical tenant_id even when the file has an example name."""
+        (temp_config_dir / "example_customer.yaml").write_text(
+            """
+tenant_id: customer_001
+persona:
+  name: Alex
+  voice_id: voice_123
+  system_prompt: You are helpful.
+llm:
+  provider: openai
+  model: gpt-4
+"""
+        )
+
+        config = TenantRegistry(temp_config_dir).load_tenant_config("customer_001")
+        assert config.tenant_id == "customer_001"
+        assert config.persona.name == "Alex"
+
     def test_load_tenant_config_toml(self, temp_config_dir: Path):
         """Test loading tenant configuration from TOML file."""
         config_file = temp_config_dir / "test_tenant.toml"

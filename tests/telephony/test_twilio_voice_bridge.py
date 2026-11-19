@@ -48,7 +48,7 @@ def mock_orchestrator():
     """Create a mock Pipecat orchestrator."""
     orchestrator = MagicMock()
     orchestrator.start_session = AsyncMock()
-    orchestrator.stop_session = AsyncMock()
+    orchestrator.stop_session = AsyncMock(return_value={"turn_count": 0})
     return orchestrator
 
 
@@ -60,6 +60,7 @@ def mock_pipeline():
     pipeline.process_audio_chunk = AsyncMock()
     pipeline.on_audio_generated = MagicMock()
     pipeline.on_latency_metric = MagicMock()
+    pipeline.on_interruption = MagicMock()
     pipeline.get_latency_metrics = MagicMock(return_value=LatencyMetrics())
     return pipeline
 
@@ -155,7 +156,9 @@ class TestTwilioVoiceBridge:
 
         assert not bridge.is_active
         assert bridge.pipeline is None
-        mock_orchestrator.stop_session.assert_called_once_with(bridge.config.session_id)
+        mock_orchestrator.stop_session.assert_called_once_with(
+            session_id=bridge.config.session_id, persist=True
+        )
 
     @pytest.mark.asyncio
     async def test_stop_bridge_already_stopped(self, bridge):

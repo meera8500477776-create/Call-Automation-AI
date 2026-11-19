@@ -9,6 +9,7 @@ and handles call routing and session lifecycle management.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any
 
@@ -65,6 +66,7 @@ class PipecatOrchestrator:
         self,
         session_id: str,
         tenant_config: TenantConfig,
+        tts_provider_config: dict[str, Any] | None = None,
     ) -> VoicePipeline:
         """Initialize voice pipeline from tenant configuration."""
         logger.info("Initializing pipeline for session=%s, tenant=%s", session_id, tenant_config.tenant_id)
@@ -94,6 +96,7 @@ class PipecatOrchestrator:
             llm_service=llm_service,
             vad_config=vad_config,
             voice_config=voice_config,
+            tts_provider_config=tts_provider_config,
             enable_barge_in=True,
             enable_interim_processing=False,
             streaming_config=streaming_config,
@@ -108,7 +111,8 @@ class PipecatOrchestrator:
         """Build STT configuration from tenant config."""
         stt = getattr(tenant_config, 'stt', None)
         return STTConfig(
-            api_key=getattr(stt, 'api_key', None) or "" if stt else "",
+            api_key=(getattr(stt, 'api_key', None) if stt else None)
+            or os.getenv("DEEPGRAM_API_KEY", ""),
             model=getattr(stt, 'model', "nova-2") if stt else "nova-2",
             language=getattr(stt, 'language', "en-US") if stt else "en-US",
             interim_results=getattr(stt, 'interim_results', True) if stt else True,
@@ -140,6 +144,7 @@ class PipecatOrchestrator:
         session_id: str,
         caller_id: str,
         call_metadata: CallMetadata,
+        tts_provider_config: dict[str, Any] | None = None,
     ) -> VoicePipeline:
         """
         Start a new voice session.
@@ -181,7 +186,9 @@ class PipecatOrchestrator:
             logger.info("Created session: %s for tenant: %s", session_id, tenant_config.tenant_id)
 
             # Initialize pipeline
-            pipeline = await self.initialize_pipeline(session_id, tenant_config)
+            pipeline = await self.initialize_pipeline(
+                session_id, tenant_config, tts_provider_config=tts_provider_config
+            )
 
             # Initialize pipeline components
             await pipeline.initialize()
